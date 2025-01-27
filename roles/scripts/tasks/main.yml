@@ -23,7 +23,7 @@
     state: directory
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: 0775
+    mode: "0775"
     recurse: true
   with_items:
     - /opt/scripts
@@ -46,6 +46,12 @@
     mode: "0775"
     force: true
     validate_certs: false
+  register: x
+  until: "x is not failed"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
   ignore_errors: true
 
 - name: Import 'TorrentCleanup.py'
@@ -57,6 +63,12 @@
     mode: "0775"
     force: true
     validate_certs: false
+  register: x
+  until: "x is not failed"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
   ignore_errors: true
 
 - name: Import 'plex_trash_fixer.py'
@@ -68,6 +80,12 @@
     mode: "0775"
     force: true
     validate_certs: false
+  register: x
+  until: "x is not failed"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
   ignore_errors: true
 
 - name: Import 'plex_autoscan_url.sh'
@@ -113,7 +131,7 @@
     group: "{{ user.name }}"
     mode: "0775"
     force: true
-  when: not frontail_preset.stat.exists
+  when: (not frontail_preset.stat.exists)
 
 - name: Import 'sync_torrents_to_rclone_remote.sh'
   ansible.builtin.template:
@@ -123,6 +141,7 @@
     group: "{{ user.name }}"
     mode: "0775"
     force: true
+  when: rclone_remote_is_defined and use_remote
 
 - name: Import 'download_torrents_from_rclone_remote.sh'
   ansible.builtin.template:
@@ -132,3 +151,38 @@
     group: "{{ user.name }}"
     mode: "0775"
     force: true
+  when: rclone_remote_is_defined and use_remote
+
+- name: Import 'StickyDownloadQueue.py'
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/Hidendra/nzbget-sticky-download-queue/master/StickyDownloadQueue.py"
+    dest: "/opt/scripts/nzbget/StickyDownloadQueue.py"
+    owner: "{{ user.name }}"
+    group: "{{ user.name }}"
+    mode: "0775"
+    force: true
+    validate_certs: false
+  register: x
+  until: "x is not failed"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
+  ignore_errors: true
+
+- name: Import 'CappedDownloadQueue.py'
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/Hidendra/nzbget-capped-download-queue/master/CappedDownloadQueue.py"
+    dest: "/opt/scripts/nzbget/CappedDownloadQueue.py"
+    owner: "{{ user.name }}"
+    group: "{{ user.name }}"
+    mode: "0775"
+    force: true
+    validate_certs: false
+  register: x
+  until: "x is not failed"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
+  ignore_errors: true

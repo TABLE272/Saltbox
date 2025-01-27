@@ -11,7 +11,6 @@
   ansible.builtin.shell: "{{ btop_release_lookup_command }}"
   args:
     executable: /bin/bash
-    warn: false
   register: btop_download_url
   ignore_errors: true
 
@@ -25,21 +24,32 @@
 
 - name: "btop | Download btop"
   ansible.builtin.get_url:
-    url: "{{ btop_download_url.stdout }}"
+    url: "{{ btop_version_lock_url if btop_version_lock else btop_download_url.stdout }}"
     dest: "/tmp/btop"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: '0777'
+    mode: "0755"
+  register: x
+  until: "x is not failed"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
 
 - name: "btop | Unpack btop"
   ansible.builtin.shell: "tar -xjf btop-x86_64-linux-musl.tbz"
   args:
     chdir: "/tmp/btop"
 
+- name: "btop | Ensure executable bit on install.sh"
+  ansible.builtin.file:
+    path: "/tmp/btop/btop/install.sh"
+    mode: "0755"
+
 - name: "btop | Install btop"
-  ansible.builtin.shell: "/tmp/btop/install.sh"
+  ansible.builtin.shell: "bash /tmp/btop/btop/install.sh"
   args:
-    chdir: "/tmp/btop"
+    chdir: "/tmp/btop/btop"
   become: yes
   become_user: "{{ user.name }}"
 

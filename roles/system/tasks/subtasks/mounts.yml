@@ -13,9 +13,9 @@
     verbosity: 1
 
 - name: Mounts | Set opts for '/' ext4 mount
-  mount:
+  ansible.posix.mount:
     path: /
-    opts: defaults,noatime,nobarrier
+    opts: defaults,nodiratime,relatime
     state: present
     fstype: ext4
     src: "{{ item.device }}"
@@ -23,14 +23,14 @@
     - "{{ ansible_mounts }}"
   when: (item.mount == '/') and (item.fstype == 'ext4')
 
-- name: Mounts | Install 'fuse'
+- name: "Mounts | Install 'fuse3'"
   ansible.builtin.apt:
-    name: fuse
+    name: "fuse3"
     state: present
 
 - name: Mounts | Import 'fuse.conf'
   ansible.builtin.copy:
     src: etc/fuse.conf
     dest: /etc/fuse.conf
-    mode: "0775"
+    mode: "0664"
     force: true

@@ -7,10 +7,14 @@
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: Docker Hub | Login
-  ansible.builtin.shell: "docker login -u {{ dockerhub.user }} -p {{ dockerhub.token }}"
+- name: "Docker Hub | Login"
+  community.docker.docker_login:
+    username: "{{ dockerhub.user }}"
+    password: "{{ dockerhub.token }}"
 
-- name: Docker Hub | Login
-  ansible.builtin.shell: "docker login -u {{ dockerhub.user }} -p {{ dockerhub.token }}"
+- name: "Docker Hub | Login"
+  community.docker.docker_login:
+    username: "{{ dockerhub.user }}"
+    password: "{{ dockerhub.token }}"
   become: true
   become_user: "{{ user.name }}"

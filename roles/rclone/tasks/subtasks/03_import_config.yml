@@ -15,8 +15,8 @@
   register: rclone_conf_playbook_dir
 
 - name: "Import Config | Import 'rclone.conf' from '{{ playbook_dir }}'"
+  when: rclone_conf_playbook_dir.stat.exists
   block:
-
     - name: "Import Config | Check if a previous 'rclone.conf' exists"
       ansible.builtin.stat:
         path: "/home/{{ user.name }}/.config/rclone/rclone.conf"
@@ -28,15 +28,15 @@
         dest: "/home/{{ user.name }}/.config/rclone/rclone.conf.bak"
         owner: "{{ user.name }}"
         group: "{{ user.name }}"
-        mode: "0775"
+        mode: "0664"
         force: true
-      when: (rclone_conf_default_path.stat.exists)
+      when: rclone_conf_default_path.stat.exists
 
     - name: "Import Config | Remove previous 'rclone.conf' (if it exists)"
       ansible.builtin.file:
         path: "/home/{{ user.name }}/.config/rclone/rclone.conf"
         state: absent
-      when: (rclone_conf_default_path.stat.exists)
+      when: rclone_conf_default_path.stat.exists
 
     - name: "Import Config | Import 'rclone.conf' from '{{ playbook_dir }}'"
       ansible.builtin.copy:
@@ -44,15 +44,13 @@
         dest: "/home/{{ user.name }}/.config/rclone/rclone.conf"
         owner: "{{ user.name }}"
         group: "{{ user.name }}"
-        mode: "0775"
+        mode: "0664"
         force: true
 
     - name: "Import Config | Remove imported 'rclone.conf' from '{{ playbook_dir }}'"
       ansible.builtin.file:
         path: "{{ playbook_dir }}/rclone.conf"
         state: absent
-
-  when: (rclone_conf_playbook_dir.stat.exists)
 
 # Find and import 'rclone.conf' if located somewhere else
 
@@ -62,8 +60,8 @@
   register: rclone_conf_default_path_2
 
 - name: "Import Config | Do the following block when 'rclone.conf' is not at default location"
+  when: (not rclone_conf_default_path_2.stat.exists)
   block:
-
     - name: "Import Config | Find location of 'rclone.conf' when not at default location"
       ansible.builtin.shell: rclone config file
       register: rclone_conf_current_location
@@ -74,7 +72,7 @@
         dest: "/home/{{ user.name }}/.config/rclone/rclone.conf"
         owner: "{{ user.name }}"
         group: "{{ user.name }}"
-        mode: "0775"
+        mode: "0664"
         force: true
       when: (rclone_conf_current_location.stdout.find('Configuration file doesn\'t exist') == -1)
 
@@ -88,9 +86,7 @@
       ansible.builtin.file:
         path: "/home/{{ user.name }}/.config/rclone/rclone.conf"
         state: touch
-        mode: "0775"
+        mode: "0664"
         owner: "{{ user.name }}"
         group: "{{ user.name }}"
       when: (rclone_conf_current_location.stdout.find('Configuration file doesn\'t exist') != -1)
-
-  when: not (rclone_conf_default_path_2.stat.exists)

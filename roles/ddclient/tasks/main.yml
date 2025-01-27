@@ -9,30 +9,32 @@
 #########################################################################
 ---
 - name: Stop and remove any existing container
-  docker_container:
-    name: ddclient
-    state: absent
-    container_default_behavior: compatibility
+  ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"
+  vars:
+    var_prefix: ddclient
 
 - name: Create ddclient directories
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "/opt/ddclient"
     state: directory
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
     mode: "0775"
-  with_items:
-    - /opt/ddclient
 
 - name: Set subdomains fact
   ansible.builtin.set_fact:
     subdomains:
+      - login
+      - dash
       - plex
+      - autoscan
       - tautulli
-      - "{{ ombi.subdomain | default('ombi',true) }}"
+      - overseerr
       - portainer
       - organizr
       - nzbget
+      - sabnzbd
+      - prowlarr
       - rutorrent
       - jackett
       - nzbhydra2
@@ -46,12 +48,12 @@
     dest: "/opt/ddclient/ddclient.conf"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: 0775
+    mode: "0664"
     force: false
   when: cloudflare_is_enabled
 
 - name: Create and start container
-  docker_container:
+  community.docker.docker_container:
     name: ddclient
     image: "lscr.io/linuxserver/ddclient:latest"
     pull: true
@@ -68,6 +70,7 @@
           - ddclient
     networks_cli_compatible: true
     network_mode: "{{ docker_networks_name_common }}"
-    purge_networks: true
+    container_default_behavior: compatibility
+    tls_hostname: localhost
     restart_policy: unless-stopped
     state: started

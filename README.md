@@ -7,7 +7,7 @@
 
 Saltbox is an Ansible-based solution for rapidly deploying a Docker containerized cloud media server heavily based on [Cloudbox](https://github.com/Cloudbox/Cloudbox).
 
-This project was designed for x64 machines running Ubuntu Server 20.04 or 22.04. 
+This project was designed for x64 machines running Ubuntu Server 22.04 or 24.04. 
 
 ### Documentation
 
@@ -21,13 +21,13 @@ This project was designed for x64 machines running Ubuntu Server 20.04 or 22.04.
 - Radarr
 - Lidarr
 - Rclone
-- NZBGet
+- SABnzbd
 - ruTorrent
 - Tautulli
 - NZBHydra2
 - Jackett
 - Overseer
-- Plex Autoscan
+- Autoscan
 - Cloudplow
 - Organizr
 - Portainer
@@ -37,21 +37,24 @@ This project was designed for x64 machines running Ubuntu Server 20.04 or 22.04.
 - and more...
 
 If you find this project helpful, feel free to make a small [donation](https://github.com/sponsors/saltydk) to the developer.
+<br>
+<br>
 
-### JetBrains
-Thank you to [<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg" alt="JetBrains" width="32"> JetBrains](http://www.jetbrains.com/) for providing us with free licenses to their great tools.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./pictures/jetbrains-white.svg">
+  <img alt="JetBrains" src="./pictures/jetbrains.svg">
+</picture>
+
+<br>
+<br>
+
+Thank you to [JetBrains](https://www.jetbrains.com/) for providing us with free licenses to their great tools.
+
 
 ### Contributors
 
 <table>
 <tr>
-    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
-        <a href=https://github.com/desimaniac>
-            <img src=https://avatars.githubusercontent.com/u/5501908?v=4 width="100;"  alt=desimaniac/>
-            <br />
-            <sub style="font-size:14px"><b>desimaniac</b></sub>
-        </a>
-    </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
         <a href=https://github.com/saltydk>
             <img src=https://avatars.githubusercontent.com/u/6587950?v=4 width="100;"  alt=salty/>
@@ -60,10 +63,10 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
-        <a href=https://github.com/l3uddz>
-            <img src=https://avatars.githubusercontent.com/u/7897162?v=4 width="100;"  alt=l3uddz/>
+        <a href=https://github.com/desimaniac>
+            <img src=https://avatars.githubusercontent.com/u/5501908?v=4 width="100;"  alt=desimaniac/>
             <br />
-            <sub style="font-size:14px"><b>l3uddz</b></sub>
+            <sub style="font-size:14px"><b>desimaniac</b></sub>
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
@@ -71,6 +74,13 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
             <img src=https://avatars.githubusercontent.com/u/4283702?v=4 width="100;"  alt=owine/>
             <br />
             <sub style="font-size:14px"><b>owine</b></sub>
+        </a>
+    </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/l3uddz>
+            <img src=https://avatars.githubusercontent.com/u/7897162?v=4 width="100;"  alt=l3uddz/>
+            <br />
+            <sub style="font-size:14px"><b>l3uddz</b></sub>
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
@@ -104,6 +114,13 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/JigSawFr>
+            <img src=https://avatars.githubusercontent.com/u/5781907?v=4 width="100;"  alt=JigSaw/>
+            <br />
+            <sub style="font-size:14px"><b>JigSaw</b></sub>
+        </a>
+    </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
         <a href=https://github.com/andrewkhunn>
             <img src=https://avatars.githubusercontent.com/u/116436?v=4 width="100;"  alt=Andrew Hunn/>
             <br />
@@ -112,9 +129,9 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
         <a href=https://github.com/BeansIsFat>
-            <img src=https://avatars.githubusercontent.com/u/24848012?v=4 width="100;"  alt=BeansIsFat/>
+            <img src=https://avatars.githubusercontent.com/u/24848012?v=4 width="100;"  alt=Beans Baxter/>
             <br />
-            <sub style="font-size:14px"><b>BeansIsFat</b></sub>
+            <sub style="font-size:14px"><b>Beans Baxter</b></sub>
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
@@ -124,15 +141,22 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
             <sub style="font-size:14px"><b>Max Kowalski</b></sub>
         </a>
     </td>
-    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
-        <a href=https://github.com/Migz93>
-            <img src=https://avatars.githubusercontent.com/u/33037112?v=4 width="100;"  alt=Migz93/>
-            <br />
-            <sub style="font-size:14px"><b>Migz93</b></sub>
-        </a>
-    </td>
 </tr>
 <tr>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/TABLE272>
+            <img src=https://avatars.githubusercontent.com/u/11992630?v=4 width="100;"  alt=TABLE272/>
+            <br />
+            <sub style="font-size:14px"><b>TABLE272</b></sub>
+        </a>
+    </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/keldian>
+            <img src=https://avatars.githubusercontent.com/u/953679?v=4 width="100;"  alt=keldian/>
+            <br />
+            <sub style="font-size:14px"><b>keldian</b></sub>
+        </a>
+    </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
         <a href=https://github.com/lonix>
             <img src=https://avatars.githubusercontent.com/u/2330355?v=4 width="100;"  alt=Stian Buch Larsen/>
@@ -140,6 +164,29 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
             <sub style="font-size:14px"><b>Stian Buch Larsen</b></sub>
         </a>
     </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/Migz93>
+            <img src=https://avatars.githubusercontent.com/u/33037112?v=4 width="100;"  alt=Migz93/>
+            <br />
+            <sub style="font-size:14px"><b>Migz93</b></sub>
+        </a>
+    </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/FML128>
+            <img src=https://avatars.githubusercontent.com/u/33214722?v=4 width="100;"  alt=Merlin Jehli/>
+            <br />
+            <sub style="font-size:14px"><b>Merlin Jehli</b></sub>
+        </a>
+    </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/Aethenn>
+            <img src=https://avatars.githubusercontent.com/u/58144688?v=4 width="100;"  alt=Aethenn/>
+            <br />
+            <sub style="font-size:14px"><b>Aethenn</b></sub>
+        </a>
+    </td>
+</tr>
+<tr>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
         <a href=https://github.com/horjulf>
             <img src=https://avatars.githubusercontent.com/u/6215635?v=4 width="100;"  alt=Filipe/>
@@ -162,10 +209,17 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
-        <a href=https://github.com/FML128>
-            <img src=https://avatars.githubusercontent.com/u/33214722?v=4 width="100;"  alt=Merlin Jehli/>
+        <a href=https://github.com/bobaiep>
+            <img src=https://avatars.githubusercontent.com/u/5251385?v=4 width="100;"  alt=Boba/>
             <br />
-            <sub style="font-size:14px"><b>Merlin Jehli</b></sub>
+            <sub style="font-size:14px"><b>Boba</b></sub>
+        </a>
+    </td>
+    <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
+        <a href=https://github.com/patricksindelka>
+            <img src=https://avatars.githubusercontent.com/u/9056550?v=4 width="100;"  alt=Patrick Sindelka/>
+            <br />
+            <sub style="font-size:14px"><b>Patrick Sindelka</b></sub>
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
@@ -178,17 +232,17 @@ Thank you to [<img src="https://resources.jetbrains.com/storage/products/company
 </tr>
 <tr>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
-        <a href=https://github.com/TABLE272>
-            <img src=https://avatars.githubusercontent.com/u/11992630?v=4 width="100;"  alt=TABLE272/>
+        <a href=https://github.com/powerdude>
+            <img src=https://avatars.githubusercontent.com/u/780882?v=4 width="100;"  alt=powerdude/>
             <br />
-            <sub style="font-size:14px"><b>TABLE272</b></sub>
+            <sub style="font-size:14px"><b>powerdude</b></sub>
         </a>
     </td>
     <td align="center" style="word-wrap: break-word; width: 150.0; height: 150.0">
-        <a href=https://github.com/kinv>
-            <img src=https://avatars.githubusercontent.com/u/42412447?v=4 width="100;"  alt=kinv/>
+        <a href=https://github.com/r3dlobst3r>
+            <img src=https://avatars.githubusercontent.com/u/33791877?v=4 width="100;"  alt=r3dlobst3r/>
             <br />
-            <sub style="font-size:14px"><b>kinv</b></sub>
+            <sub style="font-size:14px"><b>r3dlobst3r</b></sub>
         </a>
     </td>
 </tr>

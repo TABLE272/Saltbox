@@ -1,41 +1,51 @@
 #########################################################################
 # Title:         Saltbox: Nvidia | nvtop Tasks                          #
-# Author(s):     desimaniac, l3uddz                                     #
+# Author(s):     desimaniac, l3uddz, salty                              #
 # URL:           https://github.com/saltyorg/Saltbox                    #
 # --                                                                    #
 #########################################################################
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: nvtop | Install nvtop dependencies
+- name: nvtop | Install gnupg Dependencies
   ansible.builtin.apt:
+    name: dirmngr
+    state: latest
+
+- name: nvtop | Add signing key to /etc/apt/keyrings
+  ansible.builtin.get_url:
+    url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x824A27DD09DEDA33BF7835962EA8F35793D8809A"
+    dest: "/etc/apt/keyrings/flexiondotorg.asc"
+    mode: "0644"
+  register: result
+  retries: "{{ ansible_retry_count if (not continuous_integration) else ansible_retry_count_ci }}"
+  delay: 10
+  until: result is succeeded
+  when: ansible_distribution_release in ['jammy', 'focal']
+
+- name: Nvidia | Remove old repository list
+  ansible.builtin.file:
+    path: "{{ nvidia_nvtop_apt_repo_file }}"
+    state: absent
+
+- name: nvtop | Add flexiondotorg/nvtop repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/flexiondotorg.asc] https://ppa.launchpadcontent.net/flexiondotorg/nvtop/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} main"
+    filename: "flexiondotorg"
     state: present
     update_cache: true
-    name:
-      - cmake
-      - libncurses5-dev
-      - libncursesw5-dev
+  when: ansible_distribution_release in ['jammy', 'focal']
 
-- name: nvtop | Pull nvtop repo from github
-  ansible.builtin.git:
-    clone: true
-    repo: "{{ nvidia_nvtop_git_repo_url }}"
-    dest: "/tmp/nvtop/"
-  register: nvtop_repo_clone_status
+- name: nvtop | Install nvtop
+  ansible.builtin.apt:
+    name: nvtop
+    state: latest
 
-- name: nvtop | Tasks when nvtop repo is cloned
-  block:
+- name: nvtop | Get nvtop binary version
+  ansible.builtin.shell: "{{ nvidia_nvtop_binary_version_lookup_command }}"
+  register: nvtop_binary_version
+  ignore_errors: true
 
-    - name: nvtop | Build and install nvtop
-      ansible.builtin.shell: "{{ nvidia_nvtop_binary_build_command }}"
-
-    - name: nvtop | Get nvtop binary version
-      ansible.builtin.shell: "{{ nvidia_nvtop_binary_version_lookup_command }}"
-      register: nvtop_binary_version
-      ignore_errors: true
-
-    - name: nvtop | Display nvtop binary version
-      ansible.builtin.debug:
-        msg: "nvtop {{ nvtop_binary_version.stdout }} installed."
-
-  when: nvtop_repo_clone_status is succeeded
+- name: nvtop | Display nvtop binary version
+  ansible.builtin.debug:
+    msg: "nvtop {{ nvtop_binary_version.stdout }} installed."

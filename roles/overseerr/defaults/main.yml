@@ -14,13 +14,22 @@
 overseerr_instances: ["overseerr"]
 
 ################################
+# Settings
+################################
+
+overseerr_log_level: "info"
+
+################################
 # Paths
 ################################
 
 overseerr_paths_folder: "{{ overseerr_name }}"
 overseerr_paths_location: "{{ server_appdata_path }}/{{ overseerr_paths_folder }}"
+overseerr_paths_cache: "{{ overseerr_paths_location }}/cache"
 overseerr_paths_folders_list:
   - "{{ overseerr_paths_location }}"
+  - "{{ overseerr_paths_cache }}"
+overseerr_paths_config_location: "{{ overseerr_paths_location }}/settings.json"
 
 ################################
 # Web
@@ -29,10 +38,9 @@ overseerr_paths_folders_list:
 overseerr_web_subdomain: "{{ overseerr_name }}"
 overseerr_web_domain: "{{ user.domain }}"
 overseerr_web_port: "5055"
-overseerr_web_url: "{{ 'https://' + lookup('vars', overseerr_name + '_web_subdomain', default=overseerr_web_subdomain)
-                       + '.' + lookup('vars', overseerr_name + '_web_domain', default=overseerr_web_domain)
-                    if (reverse_proxy_is_enabled)
-                    else 'http://localhost:' + lookup('vars', overseerr_name + '_web_port', default=overseerr_web_port) }}"
+overseerr_web_url: "{{ 'https://' + (lookup('vars', overseerr_name + '_web_subdomain', default=overseerr_web_subdomain) + '.' + lookup('vars', overseerr_name + '_web_domain', default=overseerr_web_domain)
+                    if (lookup('vars', overseerr_name + '_web_subdomain', default=overseerr_web_subdomain) | length > 0)
+                    else lookup('vars', overseerr_name + '_web_domain', default=overseerr_web_domain)) }}"
 
 ################################
 # DNS
@@ -43,25 +51,30 @@ overseerr_dns_zone: "{{ lookup('vars', overseerr_name + '_web_domain', default=o
 overseerr_dns_proxy: "{{ dns.proxied }}"
 
 ################################
-# Settings
-################################
-
-overseerr_log_level: "info"
-
-################################
 # Traefik
 ################################
 
-overseerr_traefik_middleware_default: "{{ traefik_default_middleware }}"
+overseerr_traefik_sso_middleware: ""
+overseerr_traefik_middleware_default: "{{ traefik_default_middleware
+                                          + (',themepark-' + lookup('vars', overseerr_name + '_name', default=overseerr_name)
+                                            if (overseerr_themepark_enabled and global_themepark_plugin_enabled)
+                                            else '') }}"
 overseerr_traefik_middleware_custom: ""
-overseerr_traefik_middleware: "{{ overseerr_traefik_middleware_default + ','
-                                  + overseerr_traefik_middleware_custom
-                               if (not overseerr_traefik_middleware_custom.startswith(',') and overseerr_traefik_middleware_custom | length > 0)
-                               else overseerr_traefik_middleware_default
-                                  + overseerr_traefik_middleware_custom }}"
-
 overseerr_traefik_certresolver: "{{ traefik_default_certresolver }}"
 overseerr_traefik_enabled: true
+overseerr_traefik_api_enabled: false
+overseerr_traefik_api_endpoint: ""
+
+################################
+# THEME
+################################
+
+# Options can be found at https://github.com/themepark-dev/theme.park
+overseerr_themepark_enabled: false
+overseerr_themepark_app: "overseerr"
+overseerr_themepark_theme: "{{ global_themepark_theme }}"
+overseerr_themepark_domain: "{{ global_themepark_domain }}"
+overseerr_themepark_addons: []
 
 ################################
 # Docker
@@ -79,14 +92,8 @@ overseerr_docker_image: "{{ lookup('vars', overseerr_name + '_docker_image_repo'
 
 # Ports
 overseerr_docker_ports_defaults: []
-overseerr_docker_ports_ui:
-  - "{{ lookup('vars', overseerr_name + '_web_port', default=overseerr_web_port) }}:{{ lookup('vars', overseerr_name + '_web_port', default=overseerr_web_port) }}"
 overseerr_docker_ports_custom: []
 overseerr_docker_ports: "{{ lookup('vars', overseerr_name + '_docker_ports_defaults', default=overseerr_docker_ports_defaults)
-                            + lookup('vars', overseerr_name + '_docker_ports_ui', default=overseerr_docker_ports_ui)
-                            + lookup('vars', overseerr_name + '_docker_ports_custom', default=overseerr_docker_ports_custom)
-                         if (not reverse_proxy_is_enabled)
-                         else lookup('vars', overseerr_name + '_docker_ports_defaults', default=overseerr_docker_ports_defaults)
                             + lookup('vars', overseerr_name + '_docker_ports_custom', default=overseerr_docker_ports_custom) }}"
 
 # Envs
@@ -102,7 +109,7 @@ overseerr_docker_envs: "{{ lookup('vars', overseerr_name + '_docker_envs_default
 overseerr_docker_commands_default: []
 overseerr_docker_commands_custom: []
 overseerr_docker_commands: "{{ lookup('vars', overseerr_name + '_docker_commands_default', default=overseerr_docker_commands_default)
-                               + lookup('vars', overseerr_name + '_docker_docker_commands_custom', default=overseerr_docker_commands_custom) }}"
+                               + lookup('vars', overseerr_name + '_docker_commands_custom', default=overseerr_docker_commands_custom) }}"
 
 # Volumes
 overseerr_docker_volumes_default:
@@ -118,8 +125,8 @@ overseerr_docker_devices: "{{ lookup('vars', overseerr_name + '_docker_devices_d
                               + lookup('vars', overseerr_name + '_docker_devices_custom', default=overseerr_docker_devices_custom) }}"
 
 # Hosts
-overseerr_docker_hosts_default: []
-overseerr_docker_hosts_custom: []
+overseerr_docker_hosts_default: {}
+overseerr_docker_hosts_custom: {}
 overseerr_docker_hosts: "{{ docker_hosts_common
                             | combine(lookup('vars', overseerr_name + '_docker_hosts_default', default=overseerr_docker_hosts_default))
                             | combine(lookup('vars', overseerr_name + '_docker_hosts_custom', default=overseerr_docker_hosts_custom)) }}"
@@ -129,10 +136,17 @@ overseerr_docker_labels_default: {}
 overseerr_docker_labels_custom: {}
 overseerr_docker_labels: "{{ docker_labels_common
                              | combine(lookup('vars', overseerr_name + '_docker_labels_default', default=overseerr_docker_labels_default))
-                             | combine(lookup('vars', overseerr_name + '_docker_labels_custom', default=overseerr_docker_labels_custom)) }}"
+                             | combine((traefik_themepark_labels
+                                       if (overseerr_themepark_enabled and global_themepark_plugin_enabled)
+                                       else {}),
+                                       lookup('vars', overseerr_name + '_docker_labels_custom', default=overseerr_docker_labels_custom)) }}"
 
 # Hostname
 overseerr_docker_hostname: "{{ overseerr_name }}"
+
+# Network Mode
+overseerr_docker_network_mode_default: "{{ docker_networks_name_common }}"
+overseerr_docker_network_mode: "{{ lookup('vars', overseerr_name + '_docker_network_mode_default', default=overseerr_docker_network_mode_default) }}"
 
 # Networks
 overseerr_docker_networks_alias: "{{ overseerr_name }}"

@@ -18,6 +18,7 @@
 
 - name: sysctl tasks
   ansible.builtin.include_tasks: "subtasks/sysctl.yml"
+  when: run_sysctl_tasks
 
 - name: pam_limits tasks
   ansible.builtin.include_tasks: "subtasks/pam_limits.yml"
@@ -27,15 +28,15 @@
 
 - name: CPU Frequency tasks
   ansible.builtin.include_tasks: "subtasks/cpufrequency.yml"
-  when: cpu_performance_mode
+  when: cpu_performance_mode and ("none" in systemd_detect_virt.stdout)
 
 - name: Remove CPU Power task
   ansible.builtin.include_tasks: "subtasks/remove_cpupower.yml"
-  when: cpu_performance_mode
+  when: cpu_performance_mode and ("none" in systemd_detect_virt.stdout)
 
 - name: Set Time Zone task
   ansible.builtin.import_tasks: "subtasks/timezone.yml"
-  when: tz is defined
+  when: (tz is defined)
   tags: set-timezone
 
 - name: Set Locale task

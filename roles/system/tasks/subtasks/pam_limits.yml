@@ -7,8 +7,8 @@
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: Set PAM limits for all users.
-  pam_limits:
+- name: Set PAM limits for all users. # noqa args[module]
+  community.general.pam_limits:
     domain: "*"
     limit_type: "{{ item.limit_type }}"
     limit_item: "{{ item.limit_item }}"

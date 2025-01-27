@@ -25,31 +25,38 @@
 - name: Remove existing Docker container
   ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"
 
-- name: Create directories
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    owner: "{{ user.name }}"
-    group: "{{ user.name }}"
-    mode: "0775"
-  with_items: "{{ lookup('vars', role_name + '_paths_folders_list') }}"
+- name: Remove existing Docker container
+  ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"
+  vars:
+    var_prefix: "error_pages"
+  when: not traefik_error_pages_enabled
 
-- name: Traefik Cloudflare Tasks
-  ansible.builtin.import_tasks: "subtasks/cloudflare.yml"
+- name: Remove existing Docker container
+  ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"
+  vars:
+    var_prefix: "authelia"
+  when: not authelia_is_master
+
+- name: Create directories
+  ansible.builtin.include_tasks: "{{ resources_tasks_path }}/directories/create_directories.yml"
 
 - name: Traefik ZeroSSL Tasks
   ansible.builtin.import_tasks: "subtasks/zerossl.yml"
-  when: (not continuous_integration)
+  when: traefik_enable_zerossl and (not continuous_integration)
 
 - name: Traefik Config Tasks
   ansible.builtin.import_tasks: "subtasks/config.yml"
   when: (not continuous_integration)
 
+- name: Traefik Crowdsec Tasks
+  ansible.builtin.import_tasks: "subtasks/crowdsec.yml"
+  when: crowdsec_is_enabled
+
 - name: Remove Certificates
   ansible.builtin.file:
     path: "{{ traefik_paths_location }}/acme.json"
     state: absent
-  when: ('traefik_reset_certs' in ansible_run_tags)
+  when: ('traefik-reset-certs' in ansible_run_tags)
 
 - name: Create Docker container
   ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/create_docker_container.yml"
@@ -80,16 +87,16 @@
   when: (not continuous_integration)
 
 - name: "Import Authelia Role"
-  ansible.builtin.import_role:
+  ansible.builtin.include_role:
     name: authelia
-  when: authelia_is_master
+  when: traefik_authelia_enabled and authelia_is_master
 
-- name: "Import Jaeger Role"
-  ansible.builtin.import_role:
-    name: jaeger
-  when: traefik.tracing
+- name: "Import Authentik Role"
+  ansible.builtin.include_role:
+    name: authentik
+  when: traefik_authentik_enabled and authentik_is_master
 
 - name: "Import Error Pages Role"
-  ansible.builtin.import_role:
+  ansible.builtin.include_role:
     name: error_pages
   when: traefik_error_pages_enabled

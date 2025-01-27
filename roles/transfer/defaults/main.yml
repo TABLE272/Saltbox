@@ -17,11 +17,7 @@ transfer_name: transfer
 # Paths
 ################################
 
-transfer_paths_folder: "{{ transfer_name }}"
-transfer_paths_location: "{{ server_appdata_path }}/{{ transfer_paths_folder }}"
-transfer_uploads_location: "/tmp/{{ transfer_name }}"
-transfer_paths_folders_list:
-  - "{{ transfer_uploads_location }}"
+transfer_uploads_location: "/tmp"
 
 ################################
 # Web
@@ -32,9 +28,9 @@ transfer_web_domain: "{{ user.domain }}"
 transfer_web_port: "8080"
 transfer_web_user: "{{ user.name }}"
 transfer_web_pass: "{{ user.pass }}"
-transfer_web_url: "{{ 'https://' + transfer_web_subdomain + '.' + transfer_web_domain
-                   if (reverse_proxy_is_enabled)
-                   else 'http://localhost:' + transfer_web_port }}"
+transfer_web_url: "{{ 'https://' + (transfer_web_subdomain + '.' + transfer_web_domain
+                   if (transfer_web_subdomain | length > 0)
+                   else transfer_web_domain) }}"
 
 ################################
 # DNS
@@ -48,15 +44,13 @@ transfer_dns_proxy: "{{ dns.proxied }}"
 # Traefik
 ################################
 
+transfer_traefik_sso_middleware: ""
 transfer_traefik_middleware_default: "{{ traefik_default_middleware }}"
 transfer_traefik_middleware_custom: ""
-transfer_traefik_middleware: "{{ transfer_traefik_middleware_default + ','
-                                 + transfer_traefik_middleware_custom
-                              if (not transfer_traefik_middleware_custom.startswith(',') and transfer_traefik_middleware_custom | length > 0)
-                              else transfer_traefik_middleware_default
-                                 + transfer_traefik_middleware_custom }}"
 transfer_traefik_certresolver: "{{ traefik_default_certresolver }}"
 transfer_traefik_enabled: true
+transfer_traefik_api_enabled: false
+transfer_traefik_api_endpoint: ""
 
 ################################
 # Docker
@@ -72,20 +66,12 @@ transfer_docker_image: "dutchcoders/transfer.sh:{{ transfer_docker_image_tag }}"
 
 # Ports
 transfer_docker_ports_defaults: []
-transfer_docker_ports_ui:
-  - "{{ transfer_web_port }}:{{ transfer_web_port }}"
 transfer_docker_ports_custom: []
 transfer_docker_ports: "{{ transfer_docker_ports_defaults
-                           + transfer_docker_ports_ui
-                           + transfer_docker_ports_custom
-                        if (not reverse_proxy_is_enabled)
-                        else transfer_docker_ports_defaults
                            + transfer_docker_ports_custom }}"
 
 # Envs
 transfer_docker_envs_default:
-  PUID: "{{ uid }}"
-  PGID: "{{ gid }}"
   TZ: "{{ tz }}"
   BASEDIR: "{{ transfer_uploads_location }}"
   PROVIDER: "local"
@@ -102,11 +88,18 @@ transfer_docker_commands: "{{ transfer_docker_commands_default
                               + transfer_docker_commands_custom }}"
 
 # Volumes
-transfer_docker_volumes_default:
-  - "{{ transfer_uploads_location }}:{{ transfer_uploads_location }}"
+transfer_docker_volumes_default: []
 transfer_docker_volumes_custom: []
 transfer_docker_volumes: "{{ transfer_docker_volumes_default
-                              + transfer_docker_volumes_custom }}"
+                             + transfer_docker_volumes_custom }}"
+
+# Mounts
+transfer_docker_mounts_default:
+  - target: /tmp
+    type: tmpfs
+transfer_docker_mounts_custom: []
+transfer_docker_mounts: "{{ transfer_docker_mounts_default
+                            + transfer_docker_mounts_custom }}"
 
 # Devices
 transfer_docker_devices_default: []
@@ -115,11 +108,11 @@ transfer_docker_devices: "{{ transfer_docker_devices_default
                               + transfer_docker_devices_custom }}"
 
 # Hosts
-transfer_docker_hosts_default: []
-transfer_docker_hosts_custom: []
+transfer_docker_hosts_default: {}
+transfer_docker_hosts_custom: {}
 transfer_docker_hosts: "{{ docker_hosts_common
-                            | combine(transfer_docker_hosts_default)
-                            | combine(transfer_docker_hosts_custom) }}"
+                           | combine(transfer_docker_hosts_default)
+                           | combine(transfer_docker_hosts_custom) }}"
 
 # Labels
 transfer_docker_labels_default: {}
@@ -156,6 +149,3 @@ transfer_docker_restart_policy: unless-stopped
 
 # State
 transfer_docker_state: started
-
-# User
-transfer_docker_user: "{{ uid }}:{{ gid }}"

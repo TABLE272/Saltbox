@@ -7,33 +7,9 @@
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: "Start | Install ruamel.yaml"
-  ansible.builtin.pip:
-    name: ruamel.yaml
-    executable: pip3
-
-- name: "Start | Check to see if yyq is installed"
-  ansible.builtin.stat:
-    path: "/usr/local/bin/yyq"
-  register: yyq_binary
-
-- name: "Start | Get yyq version"
-  ansible.builtin.shell: "/usr/local/bin/yyq --version | head -n 1 | grep -oP '(?<=version )[^ ]*'"
-  register: yyq_version_settings_check
-  ignore_errors: true
-  when: yyq_binary.stat.exists
-
-- name: "Start | Set yyq version"
-  ansible.builtin.set_fact:
-    yyq_current_version: "{{ yyq_version_settings_check.stdout
-                          if yyq_version_settings_check.stdout is defined
-                          else '0.0.0' }}"
-
 - name: "Start | Install yyq"
-  ansible.builtin.import_role:
+  ansible.builtin.include_role:
     name: yyq
-  when: (yyq_current_version is version(yyq_install_version, 'lt', version_type='semver'))
-        or (not yyq_binary.stat.exists)
 
 - name: "Start | Get 'saltbox.yml' info"
   ansible.builtin.stat:
@@ -43,13 +19,13 @@
 - name: "Start | Create list of config files"
   ansible.builtin.set_fact:
     config_files:
-      - "ansible.cfg"
       - "accounts.yml"
       - "settings.yml"
       - "adv_settings.yml"
       - "backup_config.yml"
       - "providers.yml"
-      - "hetzner_nfs.yml"
+      - "hetzner_vlan.yml"
+    traefik3_migration: "{{ true if (rclone.remotes is undefined) else false }}"
 
 - name: Start | Initialize vars with empty lists
   ansible.builtin.set_fact:
@@ -68,5 +44,5 @@
     state: file
     owner: "{{ saltbox_yml.stat.uid }}"
     group: "{{ saltbox_yml.stat.gid }}"
-    mode: 0664
-  when: (settings_updater_log.stat.exists)
+    mode: "0664"
+  when: settings_updater_log.stat.exists

@@ -6,6 +6,7 @@
 
 ### Ansible ###
 /backup.lock
+/ansible_facts.d/saltbox.fact
 
 # Vars
 /inventories/host_vars/*
@@ -18,7 +19,9 @@
 /adv_settings.yml
 /backup_config.yml
 /backup_excludes_list.txt
+/hetzner_vlan.yml
 /hetzner_nfs.yml
+/localhost.yml
 /providers.yml
 /rclone.conf
 /settings.yml
@@ -26,5 +29,6 @@
 ### Misc ###
 /.idea
 /*.log
+/*.log.*
 .vscode/settings.json
 

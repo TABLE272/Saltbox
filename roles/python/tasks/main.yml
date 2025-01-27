@@ -7,62 +7,125 @@
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: "Fail if not running {{ python_valid_distro }}"
+- name: "Fail if not running Ubuntu 20.04 when installing Python 3.8"
   ansible.builtin.fail:
-    msg: "This role is only for {{ python_valid_distro }}"
-  when: ansible_distribution_version is version(python_valid_distro, '!=')
+    msg: "This role is only for Ubuntu 22.04+ when installing Python 3.8"
+  when: ansible_distribution_version is version('20.04', '==') and python_version == "3.8"
 
-- name: Add official gpg signing key to keyring
-  ansible.builtin.apt_key:
-    keyserver: "{{ python_apt_keyserver }}"
-    id: "{{ python_apt_key_id }}"
-    keyring: /usr/share/keyrings/deadsnakes.gpg
+- name: "Fail if not running Ubuntu 22.04 when installing Python 3.10"
+  ansible.builtin.fail:
+    msg: "This role is only for Ubuntu 20.04 and 24.04+ when installing Python 3.10"
+  when: ansible_distribution_version is version('22.04', '==') and python_version == "3.10"
+
+- name: "Fail if running Ubuntu 24.04 when installing Python 3.12"
+  ansible.builtin.fail:
+    msg: "This role is only for Ubuntu 20.04 and 22.04 when installing Python 3.12"
+  when: ansible_distribution_version is version('24.04', '==') and python_version == "3.12"
+
+- name: Identify apt source files
+  ansible.builtin.find:
+    paths: /etc/apt/sources.list.d/
+    recurse: no
+  register: apt_source_files
+
+- name: Check if file contains 'deadsnakes'
+  ansible.builtin.slurp:
+    path: "{{ item.path }}"
+  register: file_contents
+  loop: "{{ apt_source_files.files }}"
+
+- name: Remove apt source files containing 'deadsnakes'
+  ansible.builtin.file:
+    path: "{{ item.item.path }}"
+    state: absent
+  loop: "{{ file_contents.results }}"
+  when: "'deadsnakes' in item.content | b64decode"
+
+- name: Update APT package index
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Ensure '/etc/apt/keyrings' exists
+  ansible.builtin.file:
+    path: "/etc/apt/keyrings"
+    state: directory
+    mode: "0755"
+    owner: "root"
+    group: "root"
+
+- name: Add gpg signing key to '/etc/apt/keyrings'
+  ansible.builtin.get_url:
+    url: https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776
+    dest: /etc/apt/keyrings/deadsnakes.asc
+    mode: "0644"
   register: result
-  retries: "{{ '0' if (not continuous_integration) else '5' }}"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
   delay: 10
   until: result is succeeded
 
 - name: Add deadsnakes/ppa
   ansible.builtin.apt_repository:
-    repo: "{{ python_apt_repo_url }}"
-    filename: "deadsnakes"
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/deadsnakes.asc] https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu {{ ansible_distribution_release }} main"
+    state: present
+    update_cache: true
   register: result
-  retries: "{{ '0' if (not continuous_integration) else '5' }}"
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
   delay: 10
   until: result is succeeded
 
-- name: "Install Python {{ python_version }}"
-  ansible.builtin.apt:
-    name: "python{{ python_version }}"
-    state: present
+- name: "Install Python Packages"
+  block:
+    - name: "Install Python {{ python_version }}"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}"
+        state: present
 
-- name: "Install Python {{ python_version }} dev"
-  ansible.builtin.apt:
-    name: "python{{ python_version }}-dev"
-    state: present
+    - name: "Install Python {{ python_version }} dev"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}-dev"
+        state: present
 
-- name: "Install Python {{ python_version }} distutils"
-  ansible.builtin.apt:
-    name: "python{{ python_version }}-distutils"
-    state: present
+    - name: "Install Python {{ python_version }} distutils"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}-distutils"
+        state: present
 
-- name: "Install Python {{ python_version }} venv"
-  ansible.builtin.apt:
-    name: "python{{ python_version }}-venv"
-    state: present
+    - name: "Install Python {{ python_version }} venv"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}-venv"
+        state: present
 
-- name: Check if pip is installed
-  ansible.builtin.command: "python{{ python_version }} -m pip --version"
-  register: pip_version
-  ignore_errors: true
+    - name: "Install pip for Python {{ python_version }}"
+      ansible.builtin.command: "python{{ python_version }} -m ensurepip"
 
-- name: Download 'get-pip.py'
-  ansible.builtin.get_url:
-    url: "{{ python_get_pip_url }}"
-    dest: /tmp/get-pip.py
-    mode: '0664'
-  when: pip_version.failed
+  rescue:
+    - name: Update APT cache
+      ansible.builtin.apt:
+        update_cache: yes
 
-- name: "Install pip for Python {{ python_version }}"
-  ansible.builtin.command: "python{{ python_version }} /tmp/get-pip.py"
-  when: pip_version.failed
+    - name: "Install Python {{ python_version }}"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}"
+        state: present
+
+    - name: "Install Python {{ python_version }} dev"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}-dev"
+        state: present
+
+    - name: "Install Python {{ python_version }} distutils"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}-distutils"
+        state: present
+
+    - name: "Install Python {{ python_version }} venv"
+      ansible.builtin.apt:
+        name: "python{{ python_version }}-venv"
+        state: present
+
+    - name: "Install pip for Python {{ python_version }}"
+      ansible.builtin.command: "python{{ python_version }} -m ensurepip"

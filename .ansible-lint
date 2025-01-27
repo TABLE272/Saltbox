@@ -8,6 +8,15 @@ exclude_paths:
   - filter_plugins/
   - library/
   - scripts/
+  - inventories/host_vars/
+
+offline: false
+
+mock_modules:
+  - find_open_port
+  - saltbox_facts
+  - qbittorrent_passwd
+  - migrate_folder
 
 skip_list:
   - braces
@@ -19,9 +28,11 @@ skip_list:
   - no-handler
   - command-instead-of-module
   - command-instead-of-shell
+  - deprecated-command-syntax
   - yaml[line-length]
   - yaml[truthy]
   - schema[tasks]
-
-warn_list:
-  - var-spacing
+  - name[casing]
+  - name[template]
+  - var-naming[no-role-prefix]
+  - schema[playbook]

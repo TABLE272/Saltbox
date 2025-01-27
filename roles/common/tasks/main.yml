@@ -28,8 +28,20 @@
     - /home/{{ user.name }}/.config
     - /home/{{ user.name }}/.config/pip
     - /opt
+    - /opt/saltbox
+    - /mnt
     - /mnt/local
     - /mnt/local/Media
+
+- name: Create common Media directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user.name }}"
+    group: "{{ user.name }}"
+    mode: "0775"
+  when: common_create_media_subfolders
+  with_items:
     - /mnt/local/Media/Movies
     - /mnt/local/Media/Music
     - /mnt/local/Media/TV
@@ -45,7 +57,7 @@
     dest: "/srv/git/saltbox/inventories/host_vars/localhost.yml"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: 0775
+    mode: "0664"
   when: (not localhost_yml.stat.exists)
 
 - name: Install required packages
@@ -56,18 +68,6 @@
       - ca-certificates
       - software-properties-common
 
-- name: Add Ubuntu repositories
-  ansible.builtin.apt_repository:
-    repo: "{{ item }}"
-    state: present
-    update_cache: true
-  with_items:
-    - 'deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} multiverse'
-    - 'deb-src http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} multiverse'
-    - 'deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }}-updates multiverse'
-    - 'deb-src http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }}-updates multiverse'
-  when: (ansible_distribution == 'Ubuntu') and (not continuous_integration)
-
 - name: Install common packages
   ansible.builtin.apt:
     state: present
@@ -77,6 +77,7 @@
       - "unzip"
       - "p7zip"
       - "curl"
+      - "wget"
       - "sqlite3"
       - "tree"
       - "lsof"
@@ -88,7 +89,6 @@
       - "htop"
       - "iotop"
       - "nload"
-      - "fail2ban"
       - "ufw"
       - "ncdu"
       - "mc"
@@ -102,20 +102,17 @@
       - "moreutils"
       - "unrar"
       - "python3-virtualenv"
-  ignore_errors: true
 
 - name: Install extra packages
   ansible.builtin.apt:
     state: present
     name:
       - "run-one"
-  ignore_errors: true
 
 - name: Fetch PCI Info
   ansible.builtin.shell: "lspci -v -s $(lspci | grep -E '.*VGA.*Intel.*' | cut -d' ' -f 1) 2>/dev/null || :"
   register: lscpi_resp
-  when:
-    - (gpu.intel)
+  when: gpu.intel
 
 - name: Install 'intel-gpu-tools'
   ansible.builtin.apt:
@@ -123,7 +120,7 @@
     name:
       - "intel-gpu-tools"
   when:
-    - (gpu.intel)
+    - gpu.intel
     - ('i915' in lscpi_resp.stdout)
 
 - name: Check to see if 'unrar' installed
@@ -135,7 +132,6 @@
   ansible.builtin.apt:
     name: unrar-free
     state: present
-  ignore_errors: true
   when: (not unrar_binary.stat.exists)
 
 - name: "Import 'pip.conf'"
@@ -144,50 +140,21 @@
     dest: "/home/{{ user.name }}/.config/pip/pip.conf"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: 0775
+    mode: "0664"
     force: true
 
-- name: Install common pip modules
-  ansible.builtin.pip:
-    state: present
-    name:
-      - certbot
-      - ndg-httpsclient
-      - apprise
-      - dnspython
-      - lxml
-      - jmespath
-      - passlib
-      - PyMySQL
-      - tld
-    executable: pip3
-  ignore_errors: true
-
-- name: "Check to see if yyq is installed"
-  ansible.builtin.stat:
-    path: "/usr/local/bin/yyq"
-  register: yyq_binary
-
-- name: "Get yyq version"
-  ansible.builtin.shell: "/usr/local/bin/yyq --version | head -n 1 | grep -oP '(?<=version )[^ ]*'"
-  register: yyq_version_settings_check
-  ignore_errors: true
-  when: yyq_binary.stat.exists
-
-- name: "Set yyq version"
-  ansible.builtin.set_fact:
-    yyq_current_version: "{{ yyq_version_settings_check.stdout
-                          if yyq_version_settings_check.stdout is defined
-                          else '0.0.0' }}"
-
 - name: "Install yyq"
-  ansible.builtin.import_role:
+  ansible.builtin.include_role:
     name: yyq
-  when: (yyq_current_version is version(yyq_install_version, 'lt', version_type='semver'))
-        or (not yyq_binary.stat.exists)
+
+- name: "Cleanup Nano tool folder"
+  ansible.builtin.file:
+    path: "/home/{{ user.name }}/.nano/tool/"
+    state: absent
+  when: nano_syntax_highlighting_enabled
 
 - name: "Install Nano Syntax Highlighting"
-  ansible.builtin.shell: "curl https://raw.githubusercontent.com/scopatz/nanorc/master/install.sh | sh"
+  ansible.builtin.shell: "curl https://raw.githubusercontent.com/galenguyer/nano-syntax-highlighting/master/install.sh | bash"
   become: true
   become_user: "{{ user.name }}"
   when: nano_syntax_highlighting_enabled

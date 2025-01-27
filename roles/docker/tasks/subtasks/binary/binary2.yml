@@ -11,12 +11,14 @@
   ansible.builtin.dpkg_selections:
     name: "{{ vars[item ~ '_dpkg'] }}"
     selection: install
+  when: (vars[item ~ '_dpkg'] in ansible_facts.packages)
 
-- name: Binary | Install '{{ lookup('vars', item + '_package') }}'
+- name: Binary | Install '{{ lookup('vars', item + '_package') }}' # noqa args[module]
   ansible.builtin.apt:
     name: "{{ lookup('vars', item + '_package') }}"
     state: "{{ docker_package_state }}"
     update_cache: true
+    allow_downgrade: true
 
 - name: Binary | Put '{{ vars[item ~ '_dpkg'] }}' into hold
   ansible.builtin.dpkg_selections:
@@ -25,7 +27,7 @@
   when: put_docker_dpkg_into_hold
 
 - name: Binary | Get '{{ vars[item ~ '_name'] }}' version
-  ansible.builtin.shell: "{{ vars[item ~ '_filepath'] }} --version | head -n 1 | awk '{ print $3 }' | sed 's/,$//'"
+  ansible.builtin.shell: "{{ vars[item ~ '_filepath'] }} '{{ 'version' if item == 'compose_cli' else '--version' }}' | head -n 1 | awk '{ print {{ '$4' if item == 'compose_cli' else '$3' }} }' | sed 's/,$//' | sed 's/v//'"
   register: binary_version
   ignore_errors: true
   changed_when: false

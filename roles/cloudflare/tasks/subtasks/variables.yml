@@ -1,6 +1,6 @@
 #########################################################################
 # Title:         Saltbox: Cloudflare | Variables Task                   #
-# Author(s):     desimaniac                                             #
+# Author(s):     desimaniac, salty                                      #
 # URL:           https://github.com/saltyorg/Saltbox                    #
 # --                                                                    #
 #########################################################################
@@ -14,17 +14,10 @@
       else 'feederbox' if ('feederbox' in ansible_run_tags)
       else '' }}"
 
-- name: Install tld python package
-  ansible.builtin.pip:
-    name: tld
-    executable: pip3
-
 - name: Get FLD
   ansible.builtin.shell: |
-    python3 -c "from tld import get_tld; res = get_tld(\"http://{{ dns_zone | default(user.domain) }}\", as_object=True); print(res.fld)"
+    {{ saltbox_python }} -c "from tld import get_tld; res = get_tld(\"http://{{ dns_zone | default(user.domain) }}\", as_object=True); print(res.fld)"
   register: fld
-
-# https://github.com/advertine/ansible-cloudflare-purge
 
 - name: Variables | Fetch Cloudflare Zones
   ansible.builtin.uri:
@@ -40,18 +33,3 @@
 - name: Variables | Set 'cloudflare_zone' Variable
   ansible.builtin.set_fact:
     cloudflare_zone: "{{ cf_zones.json.result[0].id }}"
-
-- name: Variables | Fetch Cloudflare Page Rules
-  ansible.builtin.shell: |
-    curl -X GET "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone }}/pagerules?status=active&order=status&direction=desc&match=all" \
-    -H "X-Auth-Email: {{ cloudflare.email }}" \
-    -H "X-Auth-Key: {{ cloudflare.api  }}" \
-    -H "Content-Type: application/json" \
-    | jq -r '.result[] | select(.targets[].constraint.value | contains("{{ fld.stdout }}/.well-known")) | .id'
-  args:
-    warn: false
-  register: cf_page_rules
-
-- name: Variables | Set 'cloudflare_page_rules' Variable
-  ansible.builtin.set_fact:
-    cloudflare_page_rules: "{{ cf_page_rules.stdout_lines }}"

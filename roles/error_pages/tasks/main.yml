@@ -7,14 +7,29 @@
 #                   GNU General Public License v3.0                      #
 ##########################################################################
 ---
-- name: Check if folder already exists
+- name: Check if legacy folder exists
   ansible.builtin.stat:
     path: "/opt/error_pages"
+  register: error_pages_legacy_folder
+
+- name: Migrate error pages directory
+  migrate_folder:
+    legacy_path: /opt/error_pages
+    new_path: /opt/error-pages
+    owner: "{{ user.name }}"
+    group: "{{ user.name }}"
+    mode: '0775'
+    recurse: false
+  when: error_pages_legacy_folder.stat.exists
+
+- name: Check if folder already exists
+  ansible.builtin.stat:
+    path: "/opt/error-pages"
   register: error_pages_folder
 
 - name: Create directory
   ansible.builtin.file:
-    path: "/opt/error_pages"
+    path: "/opt/error-pages"
     state: directory
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
@@ -22,8 +37,26 @@
   when: (not error_pages_folder.stat.exists)
 
 - name: Export error pages from container
-  ansible.builtin.shell: "docker run --rm -v '/opt/error_pages:/out:rw' -u '{{ uid }}:{{ gid }}' tarampampam/error-pages build --config-file ./error-pages.yml /out"
+  community.docker.docker_container:
+    name: error-pages-build
+    image: "tarampampam/error-pages"
+    user: "{{ uid }}:{{ gid }}"
+    command: "build --config-file ./error-pages.yml /out"
+    volumes:
+      - "/opt/error-pages:/out:rw"
+    networks:
+      - name: saltbox
+    container_default_behavior: compatibility
+    tls_hostname: localhost
+    auto_remove: yes
+    state: started
+    pull: true
   when: (not error_pages_folder.stat.exists)
+
+- name: Remove legacy Docker container
+  ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"
+  vars:
+    var_prefix: "error_pages"
 
 - name: Remove existing Docker container
   ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"

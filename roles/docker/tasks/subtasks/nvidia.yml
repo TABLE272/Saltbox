@@ -1,0 +1,46 @@
+#########################################################################
+# Title:         Saltbox: Docker | Nvidia Tasks                         #
+# Author(s):     salty                                                  #
+# URL:           https://github.com/saltyorg/Saltbox                    #
+# --                                                                    #
+#########################################################################
+#                   GNU General Public License v3.0                     #
+#########################################################################
+---
+- name: Nvidia | Remove old repository list
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/etc/apt/sources.list.d/nvidia-container-toolkit.list"
+    - "/etc/apt/sources.list.d/nvidia-container-runtime.list"
+
+- name: Nvidia | Add 'nvidia-container-toolkit' APT Repo Key
+  ansible.builtin.get_url:
+    url: "{{ nvidia_docker_runtime_apt_key_url }}"
+    dest: /etc/apt/keyrings/nvidia.asc
+    mode: "0644"
+    force: true
+  register: result
+  retries: "{{ ansible_retry_count if (not continuous_integration) else ansible_retry_count_ci }}"
+  delay: 10
+  until: result is succeeded
+
+- name: Nvidia | Add 'nvidia-container-toolkit' APT list
+  ansible.builtin.apt_repository:
+    repo: "{{ nvidia_docker_apt_repo_url }}"
+    filename: "{{ nvidia_docker_runtime_apt_repo_file }}"
+    state: present
+    mode: "0644"
+    update_cache: true
+
+- name: Nvidia | Remove 'nvidia-container-runtime'
+  ansible.builtin.apt:
+    name: "nvidia-container-runtime"
+    state: absent
+
+- name: Nvidia | Install 'nvidia-container-toolkit'
+  ansible.builtin.apt:
+    name: "nvidia-container-toolkit"
+    update_cache: true
+    state: latest

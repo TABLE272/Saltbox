@@ -16,7 +16,7 @@
     path: "{{ emby_paths_transcodes_location }}"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: 0775
+    mode: "0775"
     recurse: true
 
 - name: Post-Install | Import 'dlna.xml'
@@ -25,9 +25,8 @@
     dest: "{{ emby_paths_dlna_xml_location }}"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: 0775
+    mode: "0664"
     force: false
 
 - name: Post-Install | Settings Tasks
   ansible.builtin.import_tasks: "settings.yml"
-  when: reverse_proxy_is_enabled

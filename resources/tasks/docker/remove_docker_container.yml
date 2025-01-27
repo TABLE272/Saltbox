@@ -14,10 +14,17 @@
                   else role_name }}"
 
 - name: Resources | Tasks | Docker | Remove Docker Container | Remove Docker Container
-  docker_container:
+  community.docker.docker_container:
     container_default_behavior: compatibility
     force_kill: "{{ lookup('vars', _var_prefix + '_docker_force_kill', default=omit) }}"
-    name: "{{ lookup('vars', _var_prefix + '_docker_container') }}"
+    kill_signal: "{{ lookup('vars', _var_prefix + '_docker_kill_signal', default=omit) }}"
+    name: "{{ var_prefix | default(lookup('vars', _var_prefix + '_docker_container', default=_var_prefix)) }}"
     state: absent
     stop_timeout: "{{ lookup('vars', _var_prefix + '_docker_stop_timeout', default='10') }}"
     tls_hostname: localhost
+  register: remove_docker_result
+  retries: "{{ ansible_retry_count
+            if (not continuous_integration)
+            else ansible_retry_count_ci }}"
+  delay: 10
+  until: remove_docker_result is succeeded

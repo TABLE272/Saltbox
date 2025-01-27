@@ -7,31 +7,27 @@
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: Snapshot | Set default variables
-  ansible.builtin.set_fact:
-    snapshot_type: ""
-    backup_opt_path: "/opt/"
-    use_snapshot: false
-
 - name: "Snapshot | Determine '/' filesystem type"
   ansible.builtin.set_fact:
     root_fstype: "{{ item.fstype }}"
-  when: (backup.misc.snapshot) and (item.mount == '/')
+  when: backup.misc.snapshot and (item.mount == '/')
   with_items:
     - "{{ ansible_mounts }}"
 
 - name: "Snapshot | Determine '/opt' filesystem type"
   ansible.builtin.set_fact:
     opt_fstype: "{{ item.fstype }}"
-  when: (backup.misc.snapshot) and (item.mount == '/opt')
+  when: backup.misc.snapshot and (item.mount == '/opt')
   with_items:
     - "{{ ansible_mounts }}"
 
 # BTRFS
 
 - name: Snapshot | BTRFS specific tasks
+  when:
+    - backup.misc.snapshot
+    - ((root_fstype is defined) and (root_fstype == 'btrfs')) or ((opt_fstype is defined) and (opt_fstype == 'btrfs'))
   block:
-
     - name: "Snapshot | Set general BTRFS variables"
       ansible.builtin.set_fact:
         snapshot_type: "btrfs"
@@ -57,8 +53,8 @@
       register: btrfs_snapshot_mounted
 
     - name: Snapshot | Delete BTRFS snapshot
+      when: (btrfs_snapshot_mounted.stat.isdir is defined) and btrfs_snapshot_mounted.stat.isdir
       block:
-
         - name: Snapshot | Delete existing BTRFS snapshot (1/2)
           ansible.builtin.command: "btrfs subvolume delete {{ backup_snapshot_destination_path }}"
           register: snapshot_deletion
@@ -71,8 +67,6 @@
           ignore_errors: true
           when: (snapshot_deletion is failed)
 
-      when: (btrfs_snapshot_mounted.stat.isdir is defined) and (btrfs_snapshot_mounted.stat.isdir)
-
     - name: Snapshot | Create BTRFS snapshot directory
       ansible.builtin.file:
         path: "{{ item }}"
@@ -82,7 +76,3 @@
         mode: "0775"
       with_items:
         - "{{ backup_snapshot_destination_path | dirname }}"
-
-  when:
-    - (backup.misc.snapshot)
-    - ((root_fstype is defined) and (root_fstype == 'btrfs')) or ((opt_fstype is defined) and (opt_fstype == 'btrfs'))

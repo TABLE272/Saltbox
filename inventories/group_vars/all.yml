@@ -8,10 +8,18 @@
 ##########################################################################
 ---
 ################################
+# Ansible venv
+################################
+
+saltbox_python: "/srv/ansible/venv/bin/python3"
+saltbox_venv_path: "/srv/ansible/venv"
+
+################################
 # Resources
 ################################
 
 resources_tasks_path: "/srv/git/saltbox/resources/tasks"
+resources_path: "/srv/git/saltbox/resources"
 
 ################################
 # Continuous Integration
@@ -35,15 +43,13 @@ cloudflare_is_enabled: "{{ (cloudflare is defined) and
 
 cloudflare_records_enabled: "{{ cloudflare_is_enabled }}"
 
-plex_account_is_enabled: "{{ (plex is defined) and
-                             (plex is not none) and
-                             (plex | trim | length > 0) and
-                             (plex.user is defined) and
-                             (plex.user is not none) and
-                             (plex.user | trim | length > 0) and
-                             (plex.pass is defined) and
-                             (plex.pass is not none) and
-                             (plex.pass | trim | length > 0) }}"
+plex_account_lookup: "{{ '/opt/saltbox/plex.ini' | check_plex_ini(plex_instances[0]) }}"
+
+plex_account_is_enabled: "{{ plex_account_lookup.exists and
+                             (plex_account_lookup.identifier | length > 0) and
+                             (plex_account_lookup.token | length > 0) }}"
+
+crowdsec_is_enabled: "{{ crowdsec_enabled | bool }}"
 
 ################################
 # Role Conditionals
@@ -56,8 +62,6 @@ nzbs_downloads_path_is_defined: "{{ (downloads is defined) and
                                     (downloads_usenet_path is not none) and
                                     (downloads_usenet_path | trim | length > 0) }}"
 
-use_nzbs: "{{ nzbs_downloads_path_is_defined }}"
-
 torrents_downloads_path_is_defined: "{{ (downloads is defined) and
                                         (downloads is not none) and
                                         (downloads | trim | length > 0) and
@@ -65,26 +69,27 @@ torrents_downloads_path_is_defined: "{{ (downloads is defined) and
                                         (downloads_torrents_path is not none) and
                                         (downloads_torrents_path | trim | length > 0) }}"
 
-use_torrents: "{{ torrents_downloads_path_is_defined }}"
-
-feeder_mount_is_enabled: "{{ (mounts is defined) and
-                             (mounts is not none) and
-                             (mounts | trim | length > 0) and
-                             (mounts.feeder is defined) and
-                             (mounts.feeder is not none) and
-                             (mounts.feeder | trim | length > 0) and
-                             (mounts.feeder) }}"
-
 rclone_remote_is_defined: "{{ (rclone is defined) and
                               (rclone is not none) and
                               (rclone | trim | length > 0) and
-                              (rclone.remote is defined) and
-                              (rclone.remote is not none) and
-                              (rclone.remote | trim | length > 0) }}"
+                              (rclone.remotes is defined) and
+                              (rclone.remotes is not none) and
+                              (rclone.remotes | length > 0) }}"
 
-use_remote: "{{ feeder_mount_is_enabled or rclone_remote_is_defined }}"
+rclone_old_remote_is_defined: "{{ (rclone is defined) and
+                                  (rclone is not none) and
+                                  (rclone | trim | length > 0) and
+                                  (rclone.remote is defined) and
+                                  (rclone.remote is not none) and
+                                  (rclone.remote | trim | length > 0) }}"
 
-use_nvidia: "{{ gpu.nvidia }}"
+use_cloudplow: "{{ rclone_remote_is_defined and use_remote }}"
+
+use_remote: "{{ (rclone.enabled | bool) and not continuous_integration }}"
+
+use_motd: "{{ motd_install | bool }}"
+
+use_nvidia: "{{ nvidia_enabled | bool }}"
 
 ################################
 # System
@@ -106,71 +111,51 @@ downloads_torrents_path: "{{ downloads }}/torrents"
 
 downloads_usenet_path: "{{ downloads }}/nzbs"
 
+downloads_custom_path: "{{ false
+                        if downloads_torrents_path.startswith(downloads_root_path) and downloads_usenet_path.startswith(downloads_root_path)
+                        else true }}"
+
 ################################
 # User
 ################################
 
-uid: "{{ ansible_local.user[user.name].uid }}"
-
-gid: "{{ ansible_local.user[user.name].gid }}"
-
-vgid: "{{ ansible_local.group.video.gid }}"
-
-rgid: "{{ ansible_local.group.render.gid }}"
-
-dockergid: "{{ ansible_local.group.docker.gid }}"
+uid: "{{ ansible_local.saltbox.users[user.name].uid }}"
+gid: "{{ ansible_local.saltbox.users[user.name].gid }}"
+vgid: "{{ ansible_local.saltbox.groups.video.gid }}"
+rgid: "{{ ansible_local.saltbox.groups.render.gid }}"
+dockergid: "{{ ansible_local.saltbox.groups.docker.gid }}"
 
 ################################
 # Timezone
 ################################
 
 tz: "{{ system.timezone
-     if system is defined and
-        system.timezone is defined and
-        'auto' not in system.timezone | lower
-     else ansible_local.timezone
-        if ansible_local is defined and
-            ansible_local.timezone is defined and
-            ansible_local.timezone | trim | length > 0
-        else 'Etc/UTC' }}"
+     if system is defined and system.timezone is defined and 'auto' not in system.timezone | lower
+     else ansible_local.saltbox.timezone.timezone
+          if ansible_local is defined and ansible_local.saltbox.timezone is defined and ansible_local.saltbox.timezone.timezone is defined and ansible_local.saltbox.timezone.timezone | trim | length > 0
+          else 'Etc/UTC' }}"
 
 ################################
 # Network
 ################################
 
 ip_address_host: "0.0.0.0"
-
 ip_address_localhost: "127.0.0.1"
-
-ip_address_public: "{{ ansible_local.network.ip.public_ip | default(ansible_default_ipv4.address) }}"
-
-ip_address_public_is_valid: "{{ ip_address_public | ansible.utils.ipv4 }}"
-
-ipv6_address_public: "{{ ansible_local.network.ip.public_ipv6 | default(ansible_default_ipv6.address) }}"
-
-ipv6_address_public_is_valid: "{{ ipv6_address_public | ansible.utils.ipv6 }}"
-
-################################
-# Reverse Proxy
-################################
-
-reverse_proxy_is_enabled: "{{ (user is defined) and
-                              (user is not none) and
-                              (user | trim | length > 0) and
-                              (user.domain is defined) and
-                              (user.domain is not none) and
-                              (user.domain | trim | length > 0) and
-                              (user.email is defined) and
-                              (user.email is not none) and
-                              (user.email | trim | length > 0) }}"
+ip_address_public: "{{ ansible_local.saltbox.ip.public_ip }}"
+ip_address_public_is_valid: "{{ false if ansible_local.saltbox.ip.failed_ipv4 else true }}"
+ip_address_public_error: "{{ ansible_local.saltbox.ip.error_ipv4 }}"
+ipv6_address_public: "{{ ansible_local.saltbox.ip.public_ipv6 }}"
+ipv6_address_public_is_valid: "{{ false if ansible_local.saltbox.ip.failed_ipv6 else true }}"
+ipv6_address_public_error: "{{ ansible_local.saltbox.ip.error_ipv6 }}"
 
 ################################
 # Theme
 ################################
 
-# Options can be found at https://github.com/gilbN/theme.park
+# Options can be found at https://github.com/themepark-dev/theme.park
 global_themepark_theme: organizr
 global_themepark_domain: theme-park.dev
+global_themepark_plugin_enabled: false
 
 ################################
 # Authelia
@@ -179,10 +164,16 @@ global_themepark_domain: theme-park.dev
 authelia_is_master: "{{ authelia.master | bool }}"
 
 ################################
+# Authentik
+################################
+
+authentik_is_master: "{{ authelia.master | bool }}"
+
+################################
 # ZeroSSL
 ################################
 
-zerossl_is_enabled: "{{ dns.zerossl | bool }}"
+zerossl_is_enabled: "{{ (traefik_enable_zerossl | bool) and (traefik.cert.zerossl | bool) }}"
 
 ################################
 # Traefik
@@ -190,53 +181,146 @@ zerossl_is_enabled: "{{ dns.zerossl | bool }}"
 
 traefik_role_var: "{{ lookup('vars', role_name + '_name', default=role_name) }}"
 
-traefik_challenge_provider: "{{ traefik.provider }}"
+# Replaces powerdns with pdns for config sanity reasons.
+traefik_challenge_provider: "{{ traefik.provider | default('cloudflare') | replace('powerdns', 'pdns') }}"
 traefik_default_certprovider: "{{ 'cfdns'
-                               if (not dns.zerossl)
+                               if (not zerossl_is_enabled)
                                else 'zerossl' }}"
-traefik_default_zerossl_resolver: "{{ 'zerosslhttp' }}"
-traefik_default_resolver: "{{ 'httpresolver' if (traefik.http or not traefik.tls) else 'tlsresolver' }}"
+traefik_default_zerossl_resolver: "zerosslhttp"
+traefik_default_resolver: "httpresolver"
 traefik_default_certresolver: "{{ traefik_default_certprovider
-                               if (not traefik_tls)
+                               if (not (traefik_http | bool))
                                else (traefik_default_resolver if not zerossl_is_enabled else traefik_default_zerossl_resolver) }}"
 
-traefik_error_pages_enabled: "{{ traefik.error_pages }}"
-traefik_error_pages_role_enabled: "{{ lookup('vars', traefik_role_var + '_traefik_error_pages_enabled', default=lookup('vars', role_name + '_traefik_error_pages_enabled', default=False)) }}"
-traefik_error_pages_middleware: "{{ 'error-pages-middleware,'
+traefik_error_pages_enabled: "{{ traefik.error_pages | bool }}"
+traefik_error_pages_role_enabled: "{{ lookup('vars', traefik_role_var + '_traefik_error_pages_enabled', default=lookup('vars', role_name + '_traefik_error_pages_enabled', default=false)) | bool }}"
+traefik_error_pages_middleware: "{{ 'error-pages-middleware@docker,'
                                  if traefik_error_pages_enabled and traefik_error_pages_role_enabled
                                  else '' }}"
 
-traefik_default_middleware_default: "{{ traefik_error_pages_middleware + 'globalHeaders@file,secureHeaders@file'
-                                        + (',gzip'
-                                          if (lookup('vars', traefik_role_var + '_traefik_gzip_enabled', default=lookup('vars', role_name + '_traefik_gzip_enabled', default=true)))
+traefik_default_robot: true
+traefik_default_gzip: false
+traefik_default_autodetect: false
+traefik_default_cloudflarewarp: "{{ lookup('vars', traefik_role_var + '_dns_proxy', default=lookup('vars', role_name + '_dns_proxy', default=dns.proxied)) and cloudflare_is_enabled and traefik_plugin_cloudflarewarp_enabled }}"
+
+traefik_default_middleware_default: "{{ traefik_error_pages_middleware
+                                        + 'globalHeaders@file,secureHeaders@file'
+                                        + (',autodetect@docker'
+                                          if (lookup('vars', traefik_role_var + '_traefik_autodetect_enabled', default=lookup('vars', role_name + '_traefik_autodetect_enabled', default=traefik_default_autodetect)) | bool)
+                                          else '')
+                                        + (',gzip@docker'
+                                          if (lookup('vars', traefik_role_var + '_traefik_gzip_enabled', default=lookup('vars', role_name + '_traefik_gzip_enabled', default=traefik_default_gzip)) | bool)
+                                          else '')
+                                        + (',robotHeaders@file'
+                                          if (lookup('vars', traefik_role_var + '_traefik_robot_enabled', default=lookup('vars', role_name + '_traefik_robot_enabled', default=traefik_default_robot)) | bool)
                                           else '')
                                         + (',hsts@file'
-                                          if (traefik.hsts)
-                                          else '') }}"
+                                          if (traefik.hsts | bool)
+                                          else '')
+                                        + (',cloudflarewarp@docker'
+                                          if (traefik_default_cloudflarewarp | bool)
+                                          else '')
+                                        + (',crowdsec@docker'
+                                          if (lookup('vars', traefik_role_var + '_traefik_crowdsec_enabled', default=lookup('vars', role_name + '_traefik_crowdsec_enabled', default=crowdsec_is_enabled)))
+                                          else '')
+                                        + (',' if (traefik_role_middleware_sso | length > 0)
+                                               else '')
+                                        + traefik_role_middleware_sso }}"
 traefik_default_middleware_custom: ""
 traefik_default_middleware: "{{ traefik_default_middleware_default
                                 + (',' + traefik_default_middleware_custom
                                   if (not traefik_default_middleware_custom.startswith(',') and traefik_default_middleware_custom | length > 0)
                                   else traefik_default_middleware_custom) }}"
 
-traefik_default_middleware_default_http: "{{ traefik_error_pages_middleware }}globalHeaders@file,redirect-to-https"
+traefik_role_middleware_sso: "{{ lookup('vars', traefik_role_var + '_traefik_sso_middleware', default=lookup('vars', role_name + '_traefik_sso_middleware', default='')) }}"
+traefik_role_middleware_default: "{{ lookup('vars', traefik_role_var + '_traefik_middleware_default', default=lookup('vars', role_name + '_traefik_middleware_default', default='')) }}"
+traefik_role_middleware_custom: "{{ lookup('vars', traefik_role_var + '_traefik_middleware_custom', default=lookup('vars', role_name + '_traefik_middleware_custom', default='')) }}"
+
+traefik_middleware: "{{ traefik_role_middleware_default
+                        + (',' + traefik_role_middleware_custom
+                          if (not traefik_role_middleware_custom.startswith(',') and traefik_role_middleware_custom | length > 0)
+                          else traefik_role_middleware_custom) }}"
+
+traefik_default_middleware_default_http: "{{ traefik_error_pages_middleware }}globalHeaders@file,redirect-to-https@docker"
 traefik_default_middleware_custom_http: ""
 traefik_default_middleware_http: "{{ traefik_default_middleware_default_http
                                      + (',' + traefik_default_middleware_custom_http
                                        if (not traefik_default_middleware_custom_http.startswith(',') and traefik_default_middleware_custom_http | length > 0)
                                        else traefik_default_middleware_custom_http)
-                                     + (',gzip'
-                                       if (lookup('vars', traefik_role_var + '_traefik_gzip_enabled', default=lookup('vars', role_name + '_traefik_gzip_enabled', default=true)))
-                                       else '') }}"
+                                     + (',autodetect@docker'
+                                       if (lookup('vars', traefik_role_var + '_traefik_autodetect_enabled', default=lookup('vars', role_name + '_traefik_autodetect_enabled', default=traefik_default_autodetect)) | bool)
+                                       else '')
+                                     + (',gzip@docker'
+                                       if (lookup('vars', traefik_role_var + '_traefik_gzip_enabled', default=lookup('vars', role_name + '_traefik_gzip_enabled', default=traefik_default_gzip)) | bool)
+                                       else '')
+                                     + (',robotHeaders@file'
+                                       if (lookup('vars', traefik_role_var + '_traefik_robot_enabled', default=lookup('vars', role_name + '_traefik_robot_enabled', default=traefik_default_robot)) | bool)
+                                       else '')
+                                     + (',cloudflarewarp@docker'
+                                       if (traefik_default_cloudflarewarp | bool)
+                                       else '')
+                                     + (',crowdsec@docker'
+                                       if (lookup('vars', traefik_role_var + '_traefik_crowdsec_enabled', default=lookup('vars', role_name + '_traefik_crowdsec_enabled', default=crowdsec_is_enabled)) | bool)
+                                       else '')
+                                     + (',' if (traefik_role_middleware_sso | length > 0)
+                                       else '')
+                                     + traefik_role_middleware_sso }}"
 
-traefik_default_sso_middleware: "authelia"
+traefik_default_middleware_default_http_api: "globalHeaders@file,redirect-to-https@docker"
+traefik_default_middleware_custom_http_api: ""
+traefik_default_middleware_http_api: "{{ traefik_default_middleware_default_http_api
+                                         + (',' + traefik_default_middleware_custom_http_api
+                                           if (not traefik_default_middleware_custom_http_api.startswith(',') and traefik_default_middleware_custom_http_api | length > 0)
+                                           else traefik_default_middleware_custom_http_api)
+                                         + (',autodetect@docker'
+                                           if (lookup('vars', traefik_role_var + '_traefik_autodetect_enabled', default=lookup('vars', role_name + '_traefik_autodetect_enabled', default=traefik_default_autodetect)) | bool)
+                                           else '')
+                                         + (',gzip@docker'
+                                           if (lookup('vars', traefik_role_var + '_traefik_gzip_enabled', default=lookup('vars', role_name + '_traefik_gzip_enabled', default=traefik_default_gzip)) | bool)
+                                           else '')
+                                          + (',robotHeaders@file'
+                                           if (lookup('vars', traefik_role_var + '_traefik_robot_enabled', default=lookup('vars', role_name + '_traefik_robot_enabled', default=traefik_default_robot)) | bool)
+                                           else '')
+                                         + (',cloudflarewarp@docker'
+                                           if (traefik_default_cloudflarewarp | bool)
+                                           else '')
+                                         + (',crowdsec@docker'
+                                           if (lookup('vars', traefik_role_var + '_traefik_crowdsec_enabled', default=lookup('vars', role_name + '_traefik_crowdsec_enabled', default=crowdsec_is_enabled)) | bool)
+                                           else '') }}"
 
-traefik_role_enabled: "{{ lookup('vars', traefik_role_var + '_traefik_enabled', default=lookup('vars', role_name + '_traefik_enabled', default=False)) }}"
-traefik_role_api_enabled: "{{ lookup('vars', traefik_role_var + '_traefik_api_enabled', default=lookup('vars', role_name + '_traefik_api_enabled', default=False)) }}"
+traefik_default_middleware_default_api: "{{ 'globalHeaders@file,secureHeaders@file'
+                                            + (',autodetect@docker'
+                                              if (lookup('vars', traefik_role_var + '_traefik_autodetect_enabled', default=lookup('vars', role_name + '_traefik_autodetect_enabled', default=traefik_default_autodetect)) | bool)
+                                              else '')
+                                            + (',gzip@docker'
+                                              if (lookup('vars', traefik_role_var + '_traefik_gzip_enabled', default=lookup('vars', role_name + '_traefik_gzip_enabled', default=traefik_default_gzip)) | bool)
+                                              else '')
+                                            + (',robotHeaders@file'
+                                              if (lookup('vars', traefik_role_var + '_traefik_robot_enabled', default=lookup('vars', role_name + '_traefik_robot_enabled', default=traefik_default_robot)) | bool)
+                                              else '')
+                                            + (',hsts@file'
+                                              if (traefik.hsts | bool)
+                                              else '')
+                                            + (',cloudflarewarp@docker'
+                                              if (traefik_default_cloudflarewarp | bool)
+                                              else '')
+                                            + (',crowdsec@docker'
+                                              if (lookup('vars', traefik_role_var + '_traefik_crowdsec_enabled', default=lookup('vars', role_name + '_traefik_crowdsec_enabled', default=crowdsec_is_enabled)) | bool)
+                                              else '') }}"
+traefik_default_middleware_custom_api: ""
+traefik_default_middleware_api: "{{ traefik_default_middleware_default_api
+                                    + (',' + traefik_default_middleware_custom_api
+                                      if (not traefik_default_middleware_custom_api.startswith(',') and traefik_default_middleware_custom_api | length > 0)
+                                      else traefik_default_middleware_custom_api) }}"
 
-traefik_tls: "{{ false
-              if ((traefik_challenge_provider != 'cloudflare') or cloudflare_is_enabled) and (not (traefik.tls or traefik.http))
-              else true }}"
+traefik_default_sso_middleware: "authelia@docker"
+
+traefik_role_enabled: "{{ lookup('vars', traefik_role_var + '_traefik_enabled', default=lookup('vars', role_name + '_traefik_enabled', default=false)) | bool }}"
+traefik_role_api_enabled: "{{ lookup('vars', traefik_role_var + '_traefik_api_enabled', default=lookup('vars', role_name + '_traefik_api_enabled', default=false)) | bool }}"
+
+traefik_http: "{{ false
+               if ((traefik_challenge_provider != 'cloudflare') or cloudflare_is_enabled)
+               else true }}"
 
 traefik_subdomain: "{{ lookup('vars', traefik_role_var + '_web_subdomain', default=lookup('vars', role_name + '_web_subdomain', default=omit)) }}"
 traefik_domain: "{{ lookup('vars', traefik_role_var + '_web_domain', default=lookup('vars', role_name + '_web_domain', default=omit)) }}"
@@ -249,9 +333,35 @@ traefik_host: "{{ traefik_subdomain + '.' + traefik_domain
                if (traefik_subdomain | length > 0)
                else traefik_domain }}"
 
+traefik_host_override: "{{ lookup('vars', traefik_role_var + '_web_host_override', default=lookup('vars', role_name + '_web_host_override', default='')) | length > 0 }}"
+traefik_host_template: "{{ lookup('vars', traefik_role_var + '_web_host_override', default=lookup('vars', role_name + '_web_host_override', default=''))
+                        if traefik_host_override
+                        else 'Host(`' + traefik_host + '`)' }}"
+
+traefik_entrypoint_web_default: "{{ 'web' if not (lookup('vars', traefik_role_var + '_traefik_tailscale_enabled', default=false) | bool) else 'tailscale-web' }}"
+traefik_entrypoint_web: "{{ lookup('vars', traefik_role_var + '_traefik_entrypoint_web', default=traefik_entrypoint_web_default) }}"
+traefik_entrypoint_websecure_default: "{{ 'websecure' if not (lookup('vars', traefik_role_var + '_traefik_tailscale_enabled', default=false) | bool) else 'tailscale-websecure' }}"
+traefik_entrypoint_websecure: "{{ lookup('vars', traefik_role_var + '_traefik_entrypoint_websecure', default=traefik_entrypoint_websecure_default) }}"
+
+traefik_url: "{{ 'https://'
+                 + (lookup('vars', traefik_role_var + '_web_subdomain', default=lookup('vars', role_name + '_web_subdomain', default='')) + '.'
+                 + lookup('vars', traefik_role_var + '_web_domain', default=lookup('vars', role_name + '_web_domain', default=''))
+              if (lookup('vars', traefik_role_var + '_web_subdomain', default=lookup('vars', role_name + '_web_subdomain', default='')) | length > 0)
+              else lookup('vars', traefik_role_var + '_web_domain', default=lookup('vars', role_name + '_web_domain', default=''))) }}"
+
+traefik_themepark_labels:
+  - '{ "traefik.http.middlewares.themepark-{{ traefik_router }}.plugin.themepark.app": "{{ lookup("vars", traefik_role_var + "_themepark_app", default=role_name) }}" }'
+  - '{ "traefik.http.middlewares.themepark-{{ traefik_router }}.plugin.themepark.theme": "{{ lookup("vars", traefik_role_var + "_themepark_theme", default=lookup("vars", role_name + "_themepark_theme", default="")) }}" }'
+  - '{ "traefik.http.middlewares.themepark-{{ traefik_router }}.plugin.themepark.addons": "{{ (lookup("vars", traefik_role_var + "_themepark_addons", default=lookup("vars", role_name + "_themepark_addons", default="")) | join(","))
+                                                                                           if lookup("vars", traefik_role_var + "_themepark_addons", default=lookup("vars", role_name + "_themepark_addons", default="")) | length > 0
+                                                                                           else omit }}" }'
+
 ################################
 # Docker
 ################################
+
+# Toggles pruning of dangling images after container creation.
+docker_create_image_prune: true
 
 docker_volumes_downloads_nzbs: "{{ [downloads_usenet_path + ':/downloads/nzbs']
                                 if nzbs_downloads_path_is_defined
@@ -261,39 +371,68 @@ docker_volumes_downloads_torrents: "{{ [downloads_torrents_path + ':/downloads/t
                                     if torrents_downloads_path_is_defined
                                     else [] }}"
 
-docker_volumes_downloads_common: "{{ docker_volumes_downloads_nzbs + docker_volumes_downloads_torrents }}"
+docker_volumes_downloads_common: "{{ docker_volumes_downloads_nzbs + docker_volumes_downloads_torrents
+                                  if downloads_custom_path
+                                  else [downloads_root_path + ':/downloads'] }}"
 
 docker_volumes_common_folders:
-  - "/mnt:/mnt"
+  - "/mnt:/mnt:rslave"
 
-docker_volumes_common: "{{ docker_volumes_common_folders + docker_volumes_downloads_common }}"
+docker_volumes_common: "{{ docker_volumes_common_folders + docker_volumes_downloads_common
+                        if (lookup('vars', traefik_role_var + '_docker_volumes_download', default=true) | bool)
+                        else docker_volumes_common_folders }}"
 
-docker_hosts_common: []
+docker_hosts_common: {}
+
+docker_labels_docker_depends_on_template:
+  com.github.saltbox.depends_on: "{{ lookup('vars', traefik_role_var + '_depends_on', default=lookup('vars', role_name + '_depends_on', default=docker_container_network_mode_lookup))
+                                  if docker_container_network_mode
+                                  else lookup('vars', traefik_role_var + '_depends_on', default=lookup('vars', role_name + '_depends_on')) }}"
+
+docker_labels_docker_depends_on_delay_template:
+  com.github.saltbox.depends_on.delay: "{{ lookup('vars', traefik_role_var + '_depends_on_delay', default=lookup('vars', role_name + '_depends_on_delay', default='0'))
+                                        if docker_container_network_mode
+                                        else lookup('vars', traefik_role_var + '_depends_on_delay', default=lookup('vars', role_name + '_depends_on_delay')) }}"
+
+docker_labels_docker_depends_on_healthchecks_template:
+  com.github.saltbox.depends_on.healthchecks: "{{ lookup('vars', traefik_role_var + '_depends_on_healthchecks', default=lookup('vars', role_name + '_depends_on_healthchecks', default='true'))
+                                               if docker_container_network_mode
+                                               else lookup('vars', traefik_role_var + '_depends_on_healthchecks', default=lookup('vars', role_name + '_depends_on_healthchecks')) }}"
+
+docker_labels_diun_template:
+  diun.enable: "true"
+
+docker_labels_autoheal_template:
+  autoheal: "true"
+  autoheal.stop.timeout: "{{ lookup('vars', role_name + '_docker_stop_timeout', default='10') }}"
 
 docker_labels_saltbox_tmp:
   - com.github.saltbox.saltbox_managed: "true"
+  - "{{ docker_labels_diun_template if (lookup('vars', role_name + '_diun_enabled', default=true) | bool) else omit }}"
+  - "{{ docker_labels_autoheal_template if (lookup('vars', role_name + '_autoheal_enabled', default=true) | bool) else omit }}"
+  - "{{ docker_labels_docker_depends_on_template if ((lookup('vars', role_name + '_depends_on', default='') | length > 0) or docker_container_network_mode) else omit }}"
+  - "{{ docker_labels_docker_depends_on_delay_template if ((lookup('vars', role_name + '_depends_on_delay', default='') | length > 0) or docker_container_network_mode) else omit }}"
+  - "{{ docker_labels_docker_depends_on_healthchecks_template if ((lookup('vars', role_name + '_depends_on_healthchecks', default='') | length > 0) or docker_container_network_mode) else omit }}"
 
-docker_labels_diun_tmp:
-  - diun.enable: "true"
+docker_container_network_mode: "{{ 'container:' in lookup('vars', traefik_role_var + '_docker_network_mode', default=lookup('vars', role_name + '_docker_network_mode', default=docker_networks_name_common)) }}"
+docker_container_network_mode_lookup: "{{ lookup('vars', traefik_role_var + '_docker_network_mode', default=lookup('vars', role_name + '_docker_network_mode', default=docker_networks_name_common)) | split(':') | last }}"
 
-docker_labels_saltbox: "{{ docker_labels_saltbox_tmp | combine(docker_labels_diun_tmp)
-                        if lookup('vars', role_name + '_diun_enabled', default=true)
-                        else docker_labels_saltbox_tmp }}"
+docker_labels_saltbox: "{{ docker_labels_saltbox_tmp | reject('equalto', omit) | list }}"
 
 docker_labels_traefik_main:
   - traefik.enable: "true"
-  - '{ "traefik.http.routers.{{ traefik_router }}-http.entrypoints": "web" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-http.entrypoints": "{{ traefik_entrypoint_web }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-http.service": "{{ traefik_router }}-http" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}-http.rule": "Host(`{{ traefik_host }}`)" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-http.rule": "{{ traefik_host_template }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-http.priority": "20" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-http.middlewares": "{{ lookup("vars", traefik_role_var + "_traefik_middleware_http", default=lookup("vars", role_name + "_traefik_middleware_http", default=traefik_default_middleware_http)) }}" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}.entrypoints": "websecure" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}.entrypoints": "{{ traefik_entrypoint_websecure }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}.service": "{{ traefik_router }}" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}.rule": "Host(`{{ traefik_host }}`)" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}.rule": "{{ traefik_host_template }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}.priority": "{{ lookup("vars", traefik_role_var + "_traefik_priority", default=lookup("vars", role_name + "_traefik_priority", default="20")) }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}.tls.certresolver": "{{ lookup("vars", traefik_role_var + "_traefik_certresolver", default=lookup("vars", role_name + "_traefik_certresolver", default=traefik_default_certresolver)) }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}.tls.options": "securetls@file" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}.middlewares": "{{ lookup("vars", traefik_role_var + "_traefik_middleware", default=lookup("vars", role_name + "_traefik_middleware", default=omit)) }}" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}.middlewares": "{{ traefik_middleware }}" }'
   - '{ "traefik.http.services.{{ traefik_router }}-http.loadbalancer.server.port": "{{ lookup("vars", traefik_role_var + "_web_http_port", default=lookup("vars", role_name + "_web_http_port", default=traefik_loadbalancer_port)) }}" }'
   - '{ "traefik.http.services.{{ traefik_router }}-http.loadbalancer.server.scheme": "{{ lookup("vars", traefik_role_var + "_web_http_scheme", default=lookup("vars", role_name + "_web_http_scheme", default=traefik_loadbalancer_scheme)) }}" }'
   - '{ "traefik.http.services.{{ traefik_router }}-http.loadbalancer.serverstransport": "{{ lookup("vars", traefik_role_var + "_web_http_serverstransport", default=lookup("vars", role_name + "_web_http_serverstransport", default=omit)) }}" }'
@@ -302,33 +441,35 @@ docker_labels_traefik_main:
   - '{ "traefik.http.services.{{ traefik_router }}.loadbalancer.serverstransport": "{{ lookup("vars", traefik_role_var + "_web_serverstransport", default=lookup("vars", role_name + "_web_serverstransport", default=omit)) }}" }'
 
 docker_labels_traefik_api:
-  - '{ "traefik.http.routers.{{ traefik_router }}-api-http.entrypoints": "web" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-api-http.entrypoints": "{{ traefik_entrypoint_web }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-api-http.service": "{{ traefik_router }}" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}-api-http.rule": "(Host(`{{ traefik_host }}`) && PathPrefix({{ lookup("vars", traefik_role_var + "_traefik_api_endpoint", default=lookup("vars", role_name + "_traefik_api_endpoint", default=omit)) }}))" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-api-http.rule": "{{ traefik_host_template }} && ({{ lookup("vars", traefik_role_var + "_traefik_api_endpoint", default=lookup("vars", role_name + "_traefik_api_endpoint", default=omit)) }})" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-api-http.priority": "30" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}-api-http.middlewares": "{{ lookup("vars", traefik_role_var + "_traefik_api_middleware_http", default=lookup("vars", role_name + "_traefik_api_middleware_http", default=traefik_default_middleware_http)) }}" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}-api.entrypoints": "websecure" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-api-http.middlewares": "{{ lookup("vars", traefik_role_var + "_traefik_api_middleware_http", default=lookup("vars", role_name + "_traefik_api_middleware_http", default=traefik_default_middleware_http_api)) }}" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-api.entrypoints": "{{ traefik_entrypoint_websecure }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-api.service": "{{ traefik_router }}" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}-api.rule": "(Host(`{{ traefik_host }}`) && PathPrefix({{ lookup("vars", traefik_role_var + "_traefik_api_endpoint", default=lookup("vars", role_name + "_traefik_api_endpoint", default=omit)) }}))" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-api.rule": "{{ traefik_host_template }} && ({{ lookup("vars", traefik_role_var + "_traefik_api_endpoint", default=lookup("vars", role_name + "_traefik_api_endpoint", default=omit)) }})" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-api.priority": "30" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-api.tls.certresolver": "{{ lookup("vars", traefik_role_var + "_traefik_certresolver", default=lookup("vars", role_name + "_traefik_certresolver", default=traefik_default_certresolver)) }}" }'
   - '{ "traefik.http.routers.{{ traefik_router }}-api.tls.options": "securetls@file" }'
-  - '{ "traefik.http.routers.{{ traefik_router }}-api.middlewares": "{{ lookup("vars", traefik_role_var + "_traefik_api_middleware", default=lookup("vars", role_name + "_traefik_api_middleware", default=traefik_default_middleware)) }}" }'
+  - '{ "traefik.http.routers.{{ traefik_router }}-api.middlewares": "{{ lookup("vars", traefik_role_var + "_traefik_api_middleware", default=lookup("vars", role_name + "_traefik_api_middleware", default=traefik_default_middleware_api)) }}" }'
 
 docker_labels_traefik: "{{ docker_labels_traefik_main | combine(docker_labels_traefik_api)
                         if traefik_role_api_enabled
                         else docker_labels_traefik_main }}"
 
 docker_labels_common: "{{ docker_labels_saltbox | combine(docker_labels_traefik)
-                       if (traefik_role_enabled and reverse_proxy_is_enabled)
+                       if traefik_role_enabled
                        else docker_labels_saltbox }}"
 
 docker_networks_name_common: saltbox
 
+docker_networks_alias_template: "{{ (lookup('vars', role_name + '_docker_networks_alias') | split(' '))
+                                    + (lookup('vars', lookup('vars', role_name + '_name', default=role_name) + '_docker_networks_alias_custom', default=[])) }}"
+
 docker_networks_common:
   - name: "{{ docker_networks_name_common }}"
-    aliases:
-      - "{{ lookup('vars', role_name + '_docker_networks_alias') }}"
+    aliases: "{{ docker_networks_alias_template }}"
 
 dockerhub_is_enabled: "{{ (dockerhub is defined) and
                           (dockerhub is not none) and
@@ -347,23 +488,32 @@ docker_log_driver: "{{ docker_log_driver_json
                     else 'default' }}"
 
 docker_log_options_json:
-  tag: "{% raw %}'{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}'{% endraw %}" # noqa var-spacing
+  tag: "{% raw %}'{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}'{% endraw %}" # noqa jinja[spacing]
 
 docker_log_options: "{{ docker_log_options_json
                      if docker.json_driver
                      else 'default' }}"
 
+docker_network_container_health_delay: 5
+
+docker_controller_url: "http://127.0.0.1:3377"
+
 ################################
-# Cloudbox Version Manager
+# Saltbox Version Manager
 ################################
 
-cvm: https://cvm.saltbox.dev/version?url=
+svm: https://svm.saltbox.dev/version?url=
 
 ################################
 # Global Variables
 ################################
 
 reboot_is_necessary: false
+skip_dns: "{{ not (dns.ipv4 or dns.ipv6) }}"
+role_dns_enabled: "{{ lookup('vars', role_name + '_dns_enabled', default=true) | bool }}"
+docker_legacy_volume: false
+ansible_retry_count: "2"
+ansible_retry_count_ci: "5"
 
 ################################
 # Backup
@@ -371,6 +521,7 @@ reboot_is_necessary: false
 
 backup_rclone_transfers: 4
 backup_rclone_drive_chunk_size: 128M
+backup_rclone_dropbox_chunk_size: 128M
 
 reverse_proxy_apps:
   - traefik

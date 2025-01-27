@@ -1,0 +1,21 @@
+# /etc/systemd/system/saltbox_managed_docker_controller_helper.service
+#########################################################################
+# Title:         Saltbox: Docker Controller Helper                      #
+# Author(s):     salty                                                  #
+# URL:           https://github.com/saltyorg/Saltbox                    #
+# --                                                                    #
+#########################################################################
+#                   GNU General Public License v3.0                     #
+#########################################################################
+
+[Unit]
+Description=Saltbox Docker Controller Helper
+BindsTo=docker.service
+Requires=saltbox_managed_docker_controller.service
+After=docker.service saltbox_managed_docker_controller.service
+
+[Service]
+ExecStart=/srv/ansible/venv/bin/python3 /srv/git/saltbox/scripts/saltbox_docker_controller_helper.py
+
+[Install]
+WantedBy=multi-user.target

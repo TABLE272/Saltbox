@@ -7,6 +7,20 @@
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
+- name: Fail when rclone backup method is disabled and using restore_tar
+  ansible.builtin.fail:
+    msg:
+      - "Rclone backup is not enabled."
+      - "You must enable rclone, in the backup settings, to perform a with a specific tar file restore."
+  when: (not backup.rclone.enable) and (restore_tar is defined)
+
+- name: Fail when local backup method is enabled and using restore_tar
+  ansible.builtin.fail:
+    msg:
+      - "The restore_tar setting does not work with a local backup enabled."
+      - "Remember to empty the local backup folder if you disable the setting."
+  when: backup.local.enable and (restore_tar is defined)
+
 - name: "Check if user '{{ user.name }}' exists"
   ansible.builtin.shell: "id -un {{ user.name }} >/dev/null 2>&1;"
   register: user_check
@@ -15,12 +29,12 @@
 - name: User Role
   ansible.builtin.include_role:
     name: user
-  when: (user_check.rc == 1)
+  when: (user_check.rc == 1) and (not restore_tar is defined)
 
 - name: Set shell
   ansible.builtin.include_role:
     name: shell
-  when: (user_check.rc == 1)
+  when: (user_check.rc == 1) and (not restore_tar is defined)
 
 - name: Variables
   ansible.builtin.import_tasks: "variables.yml"
@@ -31,8 +45,8 @@
   register: localhost_yml_playbook_dir
 
 - name: "Import 'localhost.yml' from '{{ playbook_dir }}'"
+  when: localhost_yml_playbook_dir.stat.exists and (not restore_tar is defined)
   block:
-
     - name: "Check if a previous 'localhost.yml' exists"
       ansible.builtin.stat:
         path: "/srv/git/saltbox/inventories/host_vars/localhost.yml"
@@ -44,15 +58,15 @@
         dest: "/srv/git/saltbox/inventories/host_vars/localhost.yml.bak"
         owner: "{{ user.name }}"
         group: "{{ user.name }}"
-        mode: "0775"
+        mode: "0664"
         force: true
-      when: (localhost_yml_default_path.stat.exists)
+      when: localhost_yml_default_path.stat.exists
 
     - name: "Remove previous 'localhost.yml' (if it exists)"
       ansible.builtin.file:
         path: "/srv/git/saltbox/inventories/host_vars/localhost.yml"
         state: absent
-      when: (localhost_yml_default_path.stat.exists)
+      when: localhost_yml_default_path.stat.exists
 
     - name: "Import 'localhost.yml' from '{{ playbook_dir }}'"
       ansible.builtin.copy:
@@ -60,15 +74,13 @@
         dest: "/srv/git/saltbox/inventories/host_vars/localhost.yml"
         owner: "{{ user.name }}"
         group: "{{ user.name }}"
-        mode: "0775"
+        mode: "0664"
         force: true
 
     - name: "Remove imported 'localhost.yml' from '{{ playbook_dir }}'"
       ansible.builtin.file:
         path: "{{ playbook_dir }}/localhost.yml"
         state: absent
-
-  when: (localhost_yml_playbook_dir.stat.exists)
 
 - name: BTRFS Tasks
   ansible.builtin.include_tasks: "btrfs.yml"
@@ -118,12 +130,22 @@
 # Restore from remote backup when local backup does not exist
 - name: Restore Remote
   ansible.builtin.import_tasks: "restore_remote.yml"
-  when: (dir_files.matched | int == 0)
+  when: (dir_files.matched | int == 0) and (not restore_tar is defined)
+
+- name: Restore specific tar
+  ansible.builtin.import_tasks: "restore_tar.yml"
+  when: (dir_files.matched | int == 0) and (restore_tar is defined)
 
 - name: "Look for 'backup_excludes_list.txt' file in '{{ backup.local.destination }}'"
   ansible.builtin.stat:
     path: "{{ backup.local.destination }}/backup_excludes_list.txt"
   register: backup_excludes_list
+
+- name: "Delete 'z' opt folder when doing full restore"
+  ansible.builtin.file:
+    path: "/opt/z"
+    state: absent
+  when: (not restore_tar is defined)
 
 - name: "Copy 'backup_excludes_list.txt' from '{{ backup.local.destination }}'."
   ansible.builtin.copy:
@@ -131,14 +153,12 @@
     dest: "{{ playbook_dir }}"
     owner: "{{ user.name }}"
     group: "{{ user.name }}"
-    mode: "0775"
+    mode: "0664"
     force: true
-  when: (backup_excludes_list.stat.exists)
+  when: backup_excludes_list.stat.exists and (not restore_tar is defined)
 
 - name: "Backup existing folders in '/opt' to prevent overwriting them"
   ansible.builtin.shell: mv '/opt/{{ (item | basename | splitext)[0] }}' '/opt/{{ (item | basename | splitext)[0] }}_bak' 2>/dev/null || true
-  args:
-    warn: false
   with_fileglob:
     - "{{ backup.local.destination }}/opt/*.tar"
   loop_control:
@@ -146,8 +166,6 @@
 
 - name: "Unarchive backup tarballs into '/opt'"
   ansible.builtin.shell: tar -xf '{{ item }}' -C '/opt/'
-  args:
-    warn: false
   with_fileglob:
     - "{{ backup.local.destination }}/opt/*.tar"
   loop_control:
@@ -164,7 +182,7 @@
     state: absent
   become: true
   become_user: "{{ user.name }}"
-  when: not (backup.local.enable)
+  when: (not backup.local.enable)
 
 - name: Finished restoring the backup
   ansible.builtin.debug:

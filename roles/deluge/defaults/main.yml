@@ -36,10 +36,9 @@ deluge_paths_folders_list:
 deluge_web_subdomain: "{{ deluge_name }}"
 deluge_web_domain: "{{ user.domain }}"
 deluge_web_port: "8112"
-deluge_web_url: "{{ 'https://' + lookup('vars', deluge_name + '_web_subdomain', default=deluge_web_subdomain)
-                    + '.' + lookup('vars', deluge_name + '_web_domain', default=deluge_web_domain)
-                 if (reverse_proxy_is_enabled)
-                 else 'http://localhost:' + lookup('vars', deluge_name + '_web_port', default=deluge_web_port) }}"
+deluge_web_url: "{{ 'https://' + (deluge_web_subdomain + '.' + deluge_web_domain
+                 if (deluge_web_subdomain | length > 0)
+                 else deluge_web_domain) }}"
 
 ################################
 # DNS
@@ -53,23 +52,27 @@ deluge_dns_proxy: "{{ dns.proxied }}"
 # Traefik
 ################################
 
-deluge_traefik_middleware_default: "{{ traefik_default_middleware }}"
+deluge_traefik_sso_middleware: ""
+deluge_traefik_middleware_default: "{{ traefik_default_middleware
+                                       + (',themepark-' + lookup('vars', deluge_name + '_name', default=deluge_name)
+                                         if (deluge_themepark_enabled and global_themepark_plugin_enabled)
+                                         else '') }}"
 deluge_traefik_middleware_custom: ""
-deluge_traefik_middleware: "{{ deluge_traefik_middleware_default
-                               + (',' + deluge_traefik_middleware_custom
-                                 if (not deluge_traefik_middleware_custom.startswith(',') and deluge_traefik_middleware_custom | length > 0)
-                                 else deluge_traefik_middleware_custom) }}"
 deluge_traefik_certresolver: "{{ traefik_default_certresolver }}"
 deluge_traefik_enabled: true
+deluge_traefik_api_enabled: false
+deluge_traefik_api_endpoint: ""
 
 ################################
 # THEME
 ################################
 
-# Options can be found at https://github.com/gilbN/theme.park
+# Options can be found at https://github.com/themepark-dev/theme.park
 deluge_themepark_enabled: false
+deluge_themepark_app: "deluge"
 deluge_themepark_theme: "{{ global_themepark_theme }}"
 deluge_themepark_domain: "{{ global_themepark_domain }}"
+deluge_themepark_addons: []
 
 ################################
 # Docker
@@ -86,22 +89,16 @@ deluge_docker_image: "{{ lookup('vars', deluge_name + '_docker_image_repo', defa
                          + ':' + lookup('vars', deluge_name + '_docker_image_tag', default=deluge_docker_image_tag) }}"
 
 # Ports
-deluge_docker_ports_58112: "{{ port_lookup_58112.port
-                            if (port_lookup_58112.port is defined)
-                               and (port_lookup_58112.port | trim | length > 0)
+deluge_docker_ports_58112: "{{ port_lookup_58112.meta.port
+                            if (port_lookup_58112.meta.port is defined) and (port_lookup_58112.meta.port | trim | length > 0)
                             else '58112' }}"
 
 deluge_docker_ports_defaults:
   - "{{ deluge_docker_ports_58112 }}:{{ deluge_docker_ports_58112 }}"
   - "{{ deluge_docker_ports_58112 }}:{{ deluge_docker_ports_58112 }}/udp"
-deluge_docker_ports_ui:
-  - "{{ lookup('vars', deluge_name + '_web_port', default=deluge_web_port) }}:{{ lookup('vars', deluge_name + '_web_port', default=deluge_web_port) }}"
 deluge_docker_ports_custom: []
 deluge_docker_ports: "{{ deluge_docker_ports_defaults
-                         + deluge_docker_ports_custom
-                         + (deluge_docker_ports_ui
-                           if (not reverse_proxy_is_enabled)
-                           else []) }}"
+                         + deluge_docker_ports_custom }}"
 
 # Envs
 deluge_docker_envs_default:
@@ -110,21 +107,14 @@ deluge_docker_envs_default:
   TZ: "{{ tz }}"
   UMASK: "002"
 deluge_docker_envs_custom: {}
-deluge_docker_envs_theme:
-  DOCKER_MODS: "ghcr.io/gilbn/theme.park:deluge"
-  TP_DOMAIN: "{{ lookup('vars', deluge_name + '_themepark_domain', default=deluge_themepark_domain) }}"
-  TP_THEME: "{{ lookup('vars', deluge_name + '_themepark_theme', default=deluge_themepark_theme) }}"
 deluge_docker_envs: "{{ lookup('vars', deluge_name + '_docker_envs_default', default=deluge_docker_envs_default)
-                        | combine(lookup('vars', deluge_name + '_docker_envs_custom', default=deluge_docker_envs_custom))
-                        | combine((lookup('vars', deluge_name + '_docker_envs_theme', default=deluge_docker_envs_theme)
-                                  if deluge_themepark_enabled
-                                  else {})) }}"
+                        | combine(lookup('vars', deluge_name + '_docker_envs_custom', default=deluge_docker_envs_custom)) }}"
 
 # Commands
 deluge_docker_commands_default: []
 deluge_docker_commands_custom: []
 deluge_docker_commands: "{{ lookup('vars', deluge_name + '_docker_commands_default', default=deluge_docker_commands_default)
-                            + lookup('vars', deluge_name + '_docker_docker_commands_custom', default=deluge_docker_commands_custom) }}"
+                            + lookup('vars', deluge_name + '_docker_commands_custom', default=deluge_docker_commands_custom) }}"
 
 # Volumes
 deluge_docker_volumes_default:
@@ -141,8 +131,8 @@ deluge_docker_devices: "{{ lookup('vars', deluge_name + '_docker_devices_default
                            + lookup('vars', deluge_name + '_docker_devices_custom', default=deluge_docker_devices_custom) }}"
 
 # Hosts
-deluge_docker_hosts_default: []
-deluge_docker_hosts_custom: []
+deluge_docker_hosts_default: {}
+deluge_docker_hosts_custom: {}
 deluge_docker_hosts: "{{ docker_hosts_common
                          | combine(lookup('vars', deluge_name + '_docker_hosts_default', default=deluge_docker_hosts_default))
                          | combine(lookup('vars', deluge_name + '_docker_hosts_custom', default=deluge_docker_hosts_custom)) }}"
@@ -152,10 +142,17 @@ deluge_docker_labels_default: {}
 deluge_docker_labels_custom: {}
 deluge_docker_labels: "{{ docker_labels_common
                           | combine(lookup('vars', deluge_name + '_docker_labels_default', default=deluge_docker_labels_default))
-                          | combine(lookup('vars', deluge_name + '_docker_labels_custom', default=deluge_docker_labels_custom)) }}"
+                          | combine((traefik_themepark_labels
+                                    if (deluge_themepark_enabled and global_themepark_plugin_enabled)
+                                    else {}),
+                                    lookup('vars', deluge_name + '_docker_labels_custom', default=deluge_docker_labels_custom)) }}"
 
 # Hostname
 deluge_docker_hostname: "{{ deluge_name }}"
+
+# Network Mode
+deluge_docker_network_mode_default: "{{ docker_networks_name_common }}"
+deluge_docker_network_mode: "{{ lookup('vars', deluge_name + '_docker_network_mode_default', default=deluge_docker_network_mode_default) }}"
 
 # Networks
 deluge_docker_networks_alias: "{{ deluge_name }}"

@@ -18,20 +18,39 @@ http:
         hostsProxyHeaders:
           - "X-Forwarded-Host"
         customResponseHeaders:
-          X-Robots-Tag: "{{ traefik_x_robots }}"
           server: ""
+          x-xss-protection: ""
         frameDeny: false
         contentTypeNosniff: true
     secureHeaders:
       headers:
         sslProxyHeaders:
           X-Forwarded-Proto: https
+    dropsecurityheaders:
+      headers:
+        accessControlAllowCredentials: "true"
+        accessControlAllowHeaders: "*"
+        accessControlAllowMethods: "*"
+        accessControlAllowOriginList: "*"
+        accessControlExposeHeaders: "*"
+        accessControlMaxAge: "100000"
+        customresponseheaders:
+          content-security-policy: ""
+          cross-origin-opener-policy: ""
+          permissions-policy: ""
+          referrer-policy: ""
+          x-frame-options: ""
+          x-webkit-csp: ""
     hsts:
       headers:
         stsSeconds: 63072000
         stsIncludeSubdomains: true
         stsPreload: true
         forceSTSHeader: true
+    robotHeaders:
+      headers:
+        customResponseHeaders:
+          X-Robots-Tag: "{{ traefik_x_robots }}"
   serversTransports:
     skipverify:
       insecureSkipVerify: true

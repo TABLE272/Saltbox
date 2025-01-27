@@ -16,30 +16,30 @@
 
 - name: Docker Containers Stop Tasks
   ansible.builtin.import_tasks: "subtasks/docker/containers_stop.yml"
-  when: not (('mounts' in ansible_run_tags) or ('mounts_override' in ansible_run_tags))
+  when: (not containers_list is defined)
 
 # Existing Setup
 
-- name: Service Tasks
-  ansible.builtin.include_tasks: "subtasks/services.yml"
-  vars:
-    _service_file: "{{ item }}"
-  loop: "{{ service_files }}"
+- name: Legacy Task
+  ansible.builtin.import_tasks: "subtasks/legacy.yml"
 
-# New Setup
+# Mount Mergerfs
 
-- name: Basic Tasks
-  ansible.builtin.import_tasks: "subtasks/basics.yml"
-
-# Mount UnionFS
-
-- name: Mount UnionFS Tasks
+- name: MergerFS Tasks
   ansible.builtin.include_tasks: "subtasks/mergerfs.yml"
 
-- name: Docker Daemon Tasks
-  ansible.builtin.import_tasks: "subtasks/docker/daemon.yml"
+- name: Mounts block
+  when: ('mounts' in ansible_run_tags)
+  block:
+    - name: Docker Daemon Tasks
+      ansible.builtin.import_tasks: "subtasks/docker/daemon.yml"
 
-# Start Docker Containers
+    # Start Docker Containers
 
-- name: Docker Containers Start Tasks
-  ansible.builtin.import_tasks: "subtasks/docker/containers_start.yml"
+    - name: Docker Containers Start Tasks
+      ansible.builtin.import_tasks: "subtasks/docker/containers_start.yml"
+      when: (containers_list is defined)
+
+    - name: Docker Containers Start Tasks (no running containers)
+      ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/start_saltbox_docker_containers.yml"
+      when: (not containers_list is defined) and unionfs_docker_binary.stat.exists and unionfs_docker_service_running

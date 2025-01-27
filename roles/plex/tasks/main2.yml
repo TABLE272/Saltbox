@@ -26,26 +26,36 @@
   ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/remove_docker_container.yml"
 
 - name: Create directories
+  ansible.builtin.include_tasks: "{{ resources_tasks_path }}/directories/create_directories.yml"
+
+- name: Remove previously imported files that are no longer needed
   ansible.builtin.file:
     path: "{{ item }}"
-    state: directory
-    owner: "{{ user.name }}"
-    group: "{{ user.name }}"
-    mode: "0775"
-  with_items: "{{ lookup('vars', role_name + '_paths_folders_list') }}"
+    state: absent
+  with_items:
+    - "{{ plex_paths_location }}/98-themepark"
+    - "{{ plex_paths_location }}/99-modify-binary"
+    - "{{ server_appdata_path }}/scripts/bbe"
 
-- name: Download 98-themepark
-  ansible.builtin.get_url:
-    url: "https://raw.githubusercontent.com/GilbN/theme.park/master/docker-mods/plex/root/etc/cont-init.d/98-themepark"
-    dest: "{{ plex_paths_location }}"
-    owner: "{{ user.name }}"
-    group: "{{ user.name }}"
-    mode: "0770"
-    force: true
+- name: Plex Reset Codecs tasks
+  when: ('plex-reset-codecs' in ansible_run_tags)
+  block:
+    - name: Get contents of Plex Codecs Folder
+      ansible.builtin.find:
+        paths: "{{ plex_paths_application_support_location }}/Codecs"
+        file_type: directory
+        recurse: no
+      register: plex_codecs_removal
+
+    - name: Delete Plex Codecs Folder
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ plex_codecs_removal.files }}"
 
 - name: Pre-Install Tasks
   ansible.builtin.import_tasks: "subtasks/pre-install/main.yml"
-  when: not continuous_integration
+  when: (not continuous_integration)
 
 - name: Preferences Tasks
   ansible.builtin.import_tasks: "subtasks/preferences/preferences.yml"
@@ -53,15 +63,12 @@
 
 - name: Docker Devices Task
   ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/set_docker_devices_variable.yml"
-  when: (gpu.intel or gpu.nvidia)
+  when: gpu.intel or use_nvidia
 
 - name: Create Docker container
   ansible.builtin.include_tasks: "{{ resources_tasks_path }}/docker/create_docker_container.yml"
 
-- name: Post-Install Tasks
-  ansible.builtin.import_tasks: "subtasks/post-install/main.yml"
-
 - name: "Execute Plex Extra Tasks role"
   ansible.builtin.include_role:
     name: "plex_extra_tasks"
-  when: (not continuous_integration)
+  when: (plex_plugin_sub_zero or plex_plugin_webtools) and (not continuous_integration)

@@ -26,12 +26,12 @@ jaeger_paths_folders_list:
 # Web
 ################################
 
-jaeger_web_subdomain: "{{ traefik.subdomains.jaeger }}"
+jaeger_web_subdomain: "{{ jaeger_name }}"
 jaeger_web_domain: "{{ user.domain }}"
 jaeger_web_port: "16686"
-jaeger_web_url: "{{ 'https://' + jaeger_web_subdomain + '.' + jaeger_web_domain
-                 if (reverse_proxy_is_enabled)
-                 else 'http://localhost:' + jaeger_web_port }}"
+jaeger_web_url: "{{ 'https://' + (jaeger_web_subdomain + '.' + jaeger_web_domain
+                 if (jaeger_web_subdomain | length > 0)
+                 else jaeger_web_domain) }}"
 
 ################################
 # DNS
@@ -46,19 +46,12 @@ jaeger_dns_proxy: "{{ dns.proxied }}"
 ################################
 
 jaeger_traefik_sso_middleware: "{{ traefik_default_sso_middleware }}"
-
-jaeger_traefik_middleware_default: "{{ traefik_default_middleware + ','
-                                       + lookup('vars', jaeger_name + '_traefik_sso_middleware', default=jaeger_traefik_sso_middleware)
-                                    if (lookup('vars', jaeger_name + '_traefik_sso_middleware', default=jaeger_traefik_sso_middleware) | length > 0)
-                                    else traefik_default_middleware }}"
+jaeger_traefik_middleware_default: "{{ traefik_default_middleware }}"
 jaeger_traefik_middleware_custom: ""
-jaeger_traefik_middleware: "{{ jaeger_traefik_middleware_default + ','
-                               + jaeger_traefik_middleware_custom
-                            if (not jaeger_traefik_middleware_custom.startswith(',') and jaeger_traefik_middleware_custom | length > 0)
-                            else jaeger_traefik_middleware_default
-                               + jaeger_traefik_middleware_custom }}"
 jaeger_traefik_certresolver: "{{ traefik_default_certresolver }}"
 jaeger_traefik_enabled: true
+jaeger_traefik_api_enabled: false
+jaeger_traefik_api_endpoint: ""
 
 ################################
 # Docker
@@ -74,14 +67,8 @@ jaeger_docker_image: "jaegertracing/all-in-one:{{ jaeger_docker_image_tag }}"
 
 # Ports
 jaeger_docker_ports_defaults: []
-jaeger_docker_ports_ui:
-  - "{{ jaeger_web_port }}:{{ jaeger_web_port }}"
 jaeger_docker_ports_custom: []
 jaeger_docker_ports: "{{ jaeger_docker_ports_defaults
-                         + jaeger_docker_ports_ui
-                         + jaeger_docker_ports_custom
-                      if (not reverse_proxy_is_enabled)
-                      else jaeger_docker_ports_defaults
                          + jaeger_docker_ports_custom }}"
 
 # Envs
@@ -111,8 +98,8 @@ jaeger_docker_devices: "{{ jaeger_docker_devices_default
                            + jaeger_docker_devices_custom }}"
 
 # Hosts
-jaeger_docker_hosts_default: []
-jaeger_docker_hosts_custom: []
+jaeger_docker_hosts_default: {}
+jaeger_docker_hosts_custom: {}
 jaeger_docker_hosts: "{{ docker_hosts_common
                          | combine(jaeger_docker_hosts_default)
                          | combine(jaeger_docker_hosts_custom) }}"
@@ -148,7 +135,7 @@ jaeger_docker_security_opts: "{{ jaeger_docker_security_opts_default
                                  + jaeger_docker_security_opts_custom }}"
 
 # Restart Policy
-jaeger_docker_restart_policy: always
+jaeger_docker_restart_policy: unless-stopped
 
 # State
 jaeger_docker_state: started

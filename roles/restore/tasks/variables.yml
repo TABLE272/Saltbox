@@ -10,8 +10,8 @@
 # Remove trailing forward slashes from backup paths
 - name: Remove trailing forward slashes from backup paths
   ansible.builtin.set_fact:
-    local_tmp: { destination: "{{ (backup.local.destination | default('',true)) | regex_replace('\\/$', '') }}" }
-    rclone_tmp: { destination: "{{ (backup.rclone.destination | default('',true)) | regex_replace('\\/$', '') }}" }
+    local_tmp: { destination: "{{ (backup.local.destination | default('', true)) | regex_replace('\\/$', '') }}" }
+    rclone_tmp: { destination: "{{ (backup.rclone.destination | default('', true)) | regex_replace('\\/$', '') }}" }
 
 - name: Merge changes back
   ansible.builtin.set_fact:
@@ -21,7 +21,6 @@
       rsync: "{{ backup.rsync }}"
       cron:
         cron_time: "{{ backup.cron.cron_time }}"
-        enable: "{{ backup.cron.enable }}"
       restore_service:
         user: "{{ backup.restore_service.user }}"
         pass: "{{ backup.restore_service.pass }}"

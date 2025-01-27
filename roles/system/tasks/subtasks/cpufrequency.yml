@@ -1,6 +1,6 @@
 #########################################################################
 # Title:         Saltbox: System | CPU Frequency Tasks                  #
-# Author(s):     l3uddz, EnorMOZ, desimaniac                            #
+# Author(s):     l3uddz, EnorMOZ, desimaniac, salty                     #
 # URL:           https://github.com/saltyorg/Saltbox                    #
 # --                                                                    #
 #########################################################################
@@ -18,12 +18,10 @@
     name:
       - linux-tools-common
       - linux-tools-generic
-  when: ansible_distribution == 'Ubuntu'
+  when: (ansible_distribution == 'Ubuntu')
 
 - name: "CPU Frequency | Install 'linux-tools-{{ ansible_kernel }}'"
   ansible.builtin.shell: "apt-get install -qq $(apt-cache search -n linux-tools-{{ ansible_kernel }} | awk '{print $1}' | tail -n 1)"
-  args:
-    warn: false
   ignore_errors: true
 
 - name: CPU Frequency | Ensure 'cpufrequtils' is enabled
@@ -58,18 +56,16 @@
 
 - name: CPU Frequency | Set 'GOVERNOR' used currently to performance
   ansible.builtin.shell: 'echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor'
-  args:
-    warn: false
   ignore_errors: true
 
 - name: Populate Service Facts
   ansible.builtin.service_facts:
 
 - name: Remove ondemand | Stop and disable 'ondemand.service'
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     name: ondemand
     state: stopped
     enabled: false
     daemon_reload: true
   ignore_errors: true
-  when: "'ondemand.service' in services and services['ondemand.service']['status'] == 'enabled'"
+  when: ('ondemand.service' in services and services['ondemand.service']['status'] == 'enabled')
